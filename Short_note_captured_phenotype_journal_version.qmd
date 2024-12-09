@@ -4,28 +4,23 @@ format: html
 ---
 
 ```{r loading used packages and functions}
-library(stringr)#gestion chaines de caractères
-library(car)#anova ou graph d'analyse
-library(RVAideMemoire)#variance
-library(corrplot)# graphe correlation
-library(ggeffects) #effet prédit
+library(stringr)# handling string format in R 
+library(car) # Anova analysis
+library(ggeffects) # prediction of effects from regression models
 library(ggplot2) #graphs
 library(ggtext) #customization of ggplot legends
 library(ggpubr) #custom graph (comparison bars)
 
-library(multcomp) #multiple comparison of contrasts
 
-library(data.table) #large dataset gestion 
+library(data.table) #large dataset handling 
 
-library(lme4) #mixed model
-library(blme) #bayesian mixed model (handling singular fit)
+library(lme4) #mixed regression models
 library(DHARMa) #model diagnostic (mixed models/non linear models)
-library(MuMIn) #r-squared for glmm (Nakagawa method)
 library(rsq) #diverse rsquared including Nagelkerke
 
 library(emmeans)#comparison of marginal means from GLM
 
-library(sf) #spatial treatments
+library(sf) #spatial operations
 
 
 library(texreg) #export table in Latex format
@@ -33,18 +28,10 @@ library(kableExtra)
 
 
 
-library(MASS) #used to generate multivariate normal distribution
-
-
 library(lubridate) #handling date data
 
 
 
-
-sumna <- function(x) {
-    ret <- sum(x, na.rm = TRUE)
-    if(ret == 0 && all(is.na(x))) {NA_real_} else {ret}
-}
 
 
 #fisher.test from scinded tables:
@@ -1888,7 +1875,11 @@ boxplot(OBSMER_Bycatch[!is.na(BODY_LENGTH) & SPECIES == "Delphinus delphis",]$BO
 
 
 
-ggplot(OBSMER_Bycatch[!is.na(BODY_LENGTH) & SPECIES == "Delphinus delphis",], aes(BODY_LENGTH, SEA_STATE_grouped)) + geom_violin() + geom_boxplot(width = 0.1) +  stat_compare_means(label = "p.format", comparisons = list(c("2 - belle, vagues de 0.1 à 0.5 mètres", "Calme ou ridée"), c("3 - peu agitée, vagues de 0.5 à 1.25 mètres", "Calme ou ridée"), c("4 - agitée, vagues de 1.25 à 2.5 mètres", "2 - belle, vagues de 0.1 à 0.5 mètres"), c("Forte à grosse", "Calme ou ridée")), size=9) + ggtitle("Common dolphin - BL model - OBSMER dataset") +  labs(y = "Sea conditions (Douglas scale)", x = "Captured individuals' body length (cm)") +  theme(text = element_text(size = 30)) + scale_y_discrete(labels=c("Calm (0-1)", "Smooth (2)", "Slight (3)", "Moderate (4)", "Rough (>5)"))
+ggplot(OBSMER_Bycatch[!is.na(BODY_LENGTH) & SPECIES == "Delphinus delphis",], aes(BODY_LENGTH, SEA_STATE_grouped)) + 
+  geom_violin() + geom_boxplot(width = 0.1) +
+  stat_compare_means(label = "p.format", comparisons = list(c("2 - Smooth", "0, 1 - Calm"), c("3 - Slight", "0, 1 - Calm"), c("4 - Moderate", "2 - Smooth"), c("5, 6 - Rough to very rough", "0, 1 - Calm")), size=9) + 
+  ggtitle("Common dolphin - BL model - OBSMER dataset") +
+  labs(y = "Sea conditions (Douglas scale)", x = "Captured individuals' body length (cm)") +  theme(text = element_text(size = 30)) + scale_y_discrete(labels=c("Calm (0-1)", "Smooth (2)", "Slight (3)", "Moderate (4)", "Rough (>5)"))
 
  ggsave("Figure_S16B.pdf", device = "pdf", units = "in", width = 14, height = 8.5)
 
@@ -2975,10 +2966,10 @@ TableS7 = TableS7[TableS7$p.value < 0.05,]
 rownames(TableS7) = NULL
 
 setDT(TableS7)
-TableS7[, lapply(.SD, function(x) ifelse(str_detect(x, "\n"), str_replace_all(x, "\n", " "), x))]
+TableS7 = TableS7[, lapply(.SD, function(x) ifelse(str_detect(x, "\n"), str_replace_all(x, "\n", " "), x))]
 setDF(TableS7)
 
- kable_classic(collapse_rows(kbl(TableS7, format = "latex"), columns = 1:2, target = 1, valign= "middle"))
+ kable_classic(collapse_rows(kbl(TableS7, format = "latex"), columns = 1:2, target = 1, valign = "middle"))
 
 
  
