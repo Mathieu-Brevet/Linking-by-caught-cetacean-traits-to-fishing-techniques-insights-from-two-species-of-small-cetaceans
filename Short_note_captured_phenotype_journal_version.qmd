@@ -1892,7 +1892,18 @@ fisher.test(OBSMER_Bycatch[!is.na(BODY_LENGTH) & SPECIES == "Delphinus delphis",
 
 
 table(OBSMER_Bycatch[!is.na(BODY_LENGTH) & SPECIES == "Delphinus delphis",]$TIMING_OP)
-kruskal.test(OBSMER_Bycatch[!is.na(BODY_LENGTH) & SPECIES == "Delphinus delphis",]$BODY_LENGTH~OBSMER_Bycatch[!is.na(BODY_LENGTH) & SPECIES == "Delphinus delphis",]$TIMING_OP)
+kruskal.test(OBSMER_Bycatch[!is.na(BODY_LENGTH) & SPECIES == "Delphinus delphis",]$BODY_LENGTH ~ OBSMER_Bycatch[!is.na(BODY_LENGTH) & SPECIES == "Delphinus delphis",]$TIMING_OP)
+
+
+
+
+
+table(OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$SEA_STATE_grouped, OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$TRIMESTER)
+table(OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$SEA_STATE_grouped, OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$ICES_DIV_grouped)
+chisq.test(OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$SEA_STATE_grouped, OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$TRIMESTER)
+chisq.test(OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$SEA_STATE_grouped, OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$ICES_DIV_grouped)
+# For the interpretation of sea state effects: trimester and spatial areas are highly correlated with sea conditions: calm sea conditions were mostly reported in the Bay of Biscay and rough sea conditions mainly in the Channel Sea; these two latter conditions were also mostly reported in winter
+
 
 
 
@@ -2267,6 +2278,11 @@ ggsave("Figure_4A.pdf", device = "pdf", units = "in", width = 14, height = 8.5)
 
 
 
+ggplot(data = Decl_Obs_Merged_Bycatch_BM_PHO, aes(BODY_MASS, MESH_SIZE, color=TARGETED_ISSCAAP)) + geom_jitter()
+# For the interpretation of the latter effect: a large majority of large mesh size (>200mm) are associated with targeting miscellaneous demersal fishes (i.e. mainly mofishes or Zeidae)
+
+
+
 simulateResiduals(fittedModel = model_BM_PHO, plot = T) 
 plot(cooks.distance(model_BM_PHO) )  
 # diagnostic plots of model: OK 
@@ -2441,7 +2457,7 @@ kruskal.test(OBSMER_Bycatch$GEAR_DEPTH, OBSMER_Bycatch$MOST_FISHED_ISSCAAP)
 # gear depth was well described by the targeted taxa (and was also associated with 14% of missing value)
 
 
-# gear speed, dimension and depth were discarded from analyses due to too many missing values and/or because they were too well described by other variables (in this latter case including these varaibles in regression models resulted in too high VIF values)
+# gear speed, dimension and depth were discarded from analyses due to too many missing values and/or because they were too well described by other variables (in this latter case including these variables in regression models resulted in too high VIF values)
 
 
 
@@ -2472,7 +2488,7 @@ table(OBSMER_Bycatch[SPECIES == "Phocoena phocoena" & !is.na(BODY_LENGTH) & !is.
 
 
 
-table(OBSMER_Bycatch[SPECIES == "Phocoena phocoena" & !is.na(BODY_LENGTH) & !is.na(TARGETED_ISSCAAP) & !is.na(MESH_SIZE) & !is.na(FISHING_GEAR_grouped) & TARGETED_ISSCAAP %in% c("31 - Pleuronectiformes", "34 - Miscellaneous demersal fishes")]$FISHING_GEAR_grouped)
+table(OBSMER_Bycatch[SPECIES == "Phocoena phocoena" & !is.na(BODY_LENGTH) & !is.na(MOST_FISHED_ISSCAAP) & !is.na(MESH_SIZE) & !is.na(FISHING_GEAR_grouped) & MOST_FISHED_ISSCAAP %in% c("31 - Pleuronectiformes", "34 - Miscellaneous demersal fishes")]$FISHING_GEAR_grouped)
 # in this specific case there is rare categories in both categorical variables: removing rare categories in targeted ISSCAAP groups categories lead to the presence of too rare categories in used fishing gears. We therefore cannot use both variables in the model. In this particular case we chose to favor the use of used fishing gear in explanatory variables.
 
 
@@ -2507,6 +2523,11 @@ plot(ggemmeans(model_BL_PHO, terms = "MESH_SIZE"), show_data = T, jitter = 2, do
   theme(text = element_text(size = 30)) 
 
 ggsave("Figure_4B.pdf", device = "pdf", units = "in", width = 14, height = 8.5)
+
+
+ggplot(data = OBSMER_Bycatch_BL_PHO, aes(BODY_MASS, MESH_SIZE, color = TARGETED_ISSCAAP)) + geom_jitter()
+# For the interpretation of the latter effect: a large majority of large mesh size (>200mm) are associated with targeting miscellaneous demersal fishes (i.e. mainly mofishes or Zeidae)
+
 
 
 plot(ggemmeans(model_BL_PHO, terms = "FISHING_GEAR_grouped"), show_data = T, jitter = c(0.7, 0), dot_alpha = 0.2) +
