@@ -2362,6 +2362,13 @@ pairs(emmeans(model_BM_DCO, "TARGETED_ISSCAAP"), adjust = "none")
 # post-hoc pairwise comparison tests
 
 
+
+ggplot(data = Decl_Obs_Merged_Bycatch_BM_DCO, aes(BODY_MASS, MESH_SIZE, color=TARGETED_ISSCAAP)) + geom_jitter()
+# For the interpretation of the latter effect: a large majority of large mesh size (>200mm) are associated with targeting miscellaneous demersal fishes (i.e. mainly mofishes or Zeidae)
+
+
+
+
 simulateResiduals(fittedModel = model_BM_DCO, plot = T) 
 plot(cooks.distance(model_BM_DCO) )  
 # Diagnostic plots revealed deviations from statistical assumptions 
@@ -2525,7 +2532,7 @@ plot(ggemmeans(model_BL_PHO, terms = "MESH_SIZE"), show_data = T, jitter = 2, do
 ggsave("Figure_4B.pdf", device = "pdf", units = "in", width = 14, height = 8.5)
 
 
-ggplot(data = OBSMER_Bycatch_BL_PHO, aes(BODY_MASS, MESH_SIZE, color = TARGETED_ISSCAAP)) + geom_jitter()
+ggplot(data = OBSMER_Bycatch_BL_PHO, aes(BODY_LENGTH, MESH_SIZE, color = TARGETED_ISSCAAP)) + geom_jitter()
 # For the interpretation of the latter effect: a large majority of large mesh size (>200mm) are associated with targeting miscellaneous demersal fishes (i.e. mainly mofishes or Zeidae)
 
 
