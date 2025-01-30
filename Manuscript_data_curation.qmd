@@ -1,0 +1,1142 @@
+---
+title: "Short_note_captured_phenotype"
+format: html
+---
+
+```{r loading used packages and functions}
+
+library(stringr)# handling string format in R 
+library(data.table) #large dataset gestion 
+library(sf) #spatial treatments
+library(lubridate) #handling date data
+
+
+
+
+sumna <- function(x) {
+    ret <- sum(x, na.rm = TRUE)
+    if(ret == 0 && all(is.na(x))) {NA_real_} else {ret}
+}
+
+
+```
+
+
+
+# Retrieval of French fishing activity information
+
+
+```{r retrieval of SACROIS data}
+
+
+SACROIS=data.table()
+
+
+# we only retrieved here fishing activity information that will use latter on for complement our original dataset
+
+
+for (i in 2000:2023) {  #the year 2023 is included to take into account the marees beginning in 2022 and ending in 2023 (including not negligible amount of data about the end of 2022)
+  
+  setwd(paste0('~/',i));
+  
+  SACROIS<-rbind(fread(paste0("NAVIRES-MOIS-MAREES-JOUR-IFR_",i,".txt"), dec=",", select= c("NAVS_COD","MAREE_ID","LIEU_COD_RET_SACROIS", "SEQ_ID","DATE_SEQ","METIER_COD_SACROIS")), SACROIS);
+  
+  SACROIS=SACROIS[NAVS_COD!="",];         #removal of vessels without id
+}
+
+
+SACROIS[,NAVS_COD_YEAR:=paste(SACROIS[,NAVS_COD], str_sub(SACROIS[,DATE_SEQ],7,10), sep="_")]  #produce a unique ID per vessel ad per year
+
+
+
+
+
+#minimal requirement for being able to run the previous section: 16GB of RAM
+
+
+
+#important notice: the last studied year (here 2022) does not take into account overlapping marees (between this year and the following one): have to be corrected by taking the following year into account during computation and then removing it at the end !!!! Important to do  because represent a non-negligible amount of data at the end of the year
+
+
+
+
+
+
+```
+
+
+
+# Data curation
+
+
+The purpose of this code is to format the data so that it can be analysed later. Three datasets were used: the fisheries observer data (OBSMER data) and the French data on reported fishing activities (SACROIS data, which also includes the skipper declaration of by-catches). We prepared data to retain only variables used for analysis, time and areas of interest, while removing potentially error-prone data.
+
+
+
+## Declaration data
+
+
+```{r declaration data}
+
+### We used all available skipper declaration data, from 2019 to 2023:
+
+DECL_BYC=data.table()
+
+for (i in 2019:2023) {
+  setwd(paste0('~/',i));
+  DECL_BYC<-rbind(fread(paste0("CAPTURES-ACC-IFR_",i,".txt"), dec=",", encoding="Latin-1", colClasses=c("SECT_COD_SACROIS_NIV5"="character"))[,-c("DATE_SEQ", "ZSV_COD")], DECL_BYC)
+}
+
+
+
+
+
+
+
+### Data selection
+
+
+
+DECL_BYC=DECL_BYC[SECT_COD_SACROIS_NIV1==27,] # We only retained data from Northeast Atlantic ("27" ICES zone)
+
+DECL_BYC=DECL_BYC[ESP_LIB_FAO %in% c("Dauphin à flancs blancs Atlan.", "Dauphin bleu et blanc","Dauphin commun","Dauphin commun a bec large","Dauphin tacheté de l'Atlantiq.","Dauphins nca","Grand dauphin", "Marsouin commun")] # we only retained by-catch data on small cetacean
+
+
+DECL_BYC$NAVS_COD_YEAR=paste(DECL_BYC[,NAVS_COD], DECL_BYC[,AN], sep="_") # creation of an unique ID per vessel and per year
+
+
+
+# there is no individual traits measurements for declaration of multiple capture, we then discarded such declarations from analyses:
+
+DECL_BYC=DECL_BYC[NB_INDIVIDUS==1,]
+
+
+
+
+
+
+
+#### Corrections in data format:
+
+
+# We discarded all data with individuals weighing less than 3 kg or more than 300 kg (range of values outside the weight ranges existing in natural conditions)
+
+DECL_BYC[QUANT_POIDS_VIF_CACC_DECLARES<=3, QUANT_POIDS_VIF_CACC_DECLARES:=NA]
+DECL_BYC[QUANT_POIDS_VIF_CACC_DECLARES>=300, QUANT_POIDS_VIF_CACC_DECLARES:=NA]
+
+
+
+# Extracting targeted taxa from métiers declarations:
+
+DECL_BYC$TARGET_TAXON=str_sub(DECL_BYC$METIER_COD_SACROIS,4,6)
+
+
+# Replacement of empty strings with NA values:
+
+DECL_BYC[ENGIN_COD=="", ENGIN_COD:=NA]
+DECL_BYC[TARGET_TAXON=="", TARGET_TAXON:=NA]
+
+
+
+
+# retrieval of missing targeted taxa, using global fisheries activity declaration:
+
+
+for (i in unique(DECL_BYC[METIER_COD_SACROIS=="", MAREE_ID])) {
+  if (length(unique(str_sub(SACROIS[MAREE_ID==i, METIER_COD_SACROIS],4,6))[unique(str_sub(SACROIS[MAREE_ID==i, METIER_COD_SACROIS],4,6))!=""])==1) {
+    DECL_BYC[MAREE_ID==i, TARGET_TAXON:=unique(str_sub(SACROIS[MAREE_ID==i, METIER_COD_SACROIS],4,6))[unique(str_sub(SACROIS[MAREE_ID==i, METIER_COD_SACROIS],4,6))!=""]]
+  }
+}
+
+
+
+
+
+DECL_BYC_Short_note=DECL_BYC[ !is.na(QUANT_POIDS_VIF_CACC_DECLARES), .(ESP_LIB_FAO, QUANT_POIDS_VIF_CACC_DECLARES, AN, TRIMESTRE, SECT_COD_SACROIS_NIV3, ENGIN_COD, MAILLAGE, TARGET_TAXON, MAREE_ID, NAVS_COD_YEAR)] # selection of all by-catch data with information on body mass; and of all variables used for subsequent analyses
+
+
+
+
+```
+
+
+
+
+## Strandings data
+
+
+```{r standings data}
+
+### We used all reported strandings data, on both common dolphin and harbour porpoise, from 2000 to 2022:
+
+
+data_strandings_DEL=read.delim("data_byc_MB_2000-2022.txt", encoding = "latin1")
+
+
+data_strandings_PHO=read.delim("data_byc_Pp_MB_2000-2022.txt", encoding = "latin1")
+
+
+# conversion of continuous variables in numeric format:
+
+data_strandings_DEL$long_cm=as.numeric(data_strandings_DEL$long_cm)
+data_strandings_DEL$poids_kg=as.numeric(data_strandings_DEL$poids_kg)
+
+data_strandings_PHO$long_cm=as.numeric(data_strandings_PHO$long_cm)
+data_strandings_PHO$poids_kg=as.numeric(data_strandings_PHO$poids_kg)
+
+
+# We discarded all data with individuals weighing more than 150 kg (range of values outside the weight ranges existing in natural conditions)
+
+data_strandings_PHO[data_strandings_PHO$poids_kg>=150 & !is.na(data_strandings_PHO$poids_kg), ]$poids_kg=NA
+
+
+
+
+# Recoding individual's sex explicitly:
+
+data_strandings_DEL$SEXE=data_strandings_DEL$code_sexe
+data_strandings_DEL[data_strandings_DEL$code_sexe==1,]$SEXE="Male"
+data_strandings_DEL[data_strandings_DEL$code_sexe %in% 2:3,]$SEXE="Female"
+data_strandings_DEL[data_strandings_DEL$code_sexe==0,]$SEXE=NA
+
+
+data_strandings_PHO$SEXE=data_strandings_PHO$code_sexe
+data_strandings_PHO[data_strandings_PHO$code_sexe==1,]$SEXE="Male"
+data_strandings_PHO[data_strandings_PHO$code_sexe %in% 2:3,]$SEXE="Female"
+data_strandings_PHO[data_strandings_PHO$code_sexe==0,]$SEXE=NA
+
+
+
+
+# retrieving approximate dates of death (year and trimester with the greatest overlap with estimated date of death interval):
+
+
+data_strandings_DEL$date_mort_max=as.Date(data_strandings_DEL$date_mort_max, format = "%d/%m/%Y")
+data_strandings_DEL$date_mort_min=as.Date(data_strandings_DEL$date_mort_min, format = "%d/%m/%Y")
+
+data_strandings_PHO$date_mort_max=as.Date(data_strandings_PHO$date_mort_max, format = "%d/%m/%Y")
+data_strandings_PHO$date_mort_min=as.Date(data_strandings_PHO$date_mort_min, format = "%d/%m/%Y")
+
+
+data_strandings_DEL$date_mean_death=do.call("c", apply(data_strandings_DEL[,c("date_mort_max", "date_mort_min")], 1, function(x) mean.Date(as.Date(x)), simplify = F))
+
+data_strandings_PHO$date_mean_death=do.call("c", apply(data_strandings_PHO[,c("date_mort_max", "date_mort_min")], 1, function(x) mean.Date(as.Date(x)), simplify = F))
+
+
+data_strandings_DEL$YEAR=str_sub(data_strandings_DEL$date_mean_death, 1, 4)
+
+data_strandings_PHO$YEAR=str_sub(data_strandings_PHO$date_mean_death, 1, 4)
+
+
+data_strandings_DEL$MONTH=str_sub(data_strandings_DEL$date_mean_death, 6, 7)
+
+data_strandings_PHO$MONTH=str_sub(data_strandings_PHO$date_mean_death, 6, 7)
+
+
+data_strandings_DEL$Trimester=as.character(ceiling(as.integer(data_strandings_DEL$MONTH)/3))
+
+data_strandings_PHO$Trimester=as.character(ceiling(as.integer(data_strandings_PHO$MONTH)/3))
+
+
+
+
+
+# Using observation ID as rownames:
+
+data_strandings_DEL$ID=rownames(data_strandings_DEL)
+data_strandings_PHO$ID=rownames(data_strandings_PHO)
+
+
+
+
+# Selection of areas of interest and retrieval of ICES division associated with location points of strandings:
+
+allgeo <- readRDS("~/allgeo.rds")
+allgeo2=allgeo[allgeo$offname %in% c("27.8.a", "27.8.b", "27.7.e", "27.7.d",  "27.4.c"),] #selection of only ices division along the French coast
+
+
+
+pos=na.omit(data_strandings_DEL[,c("com_coord_lat","com_coord_long", "ID")])
+
+pos=st_as_sf(pos, coords = c("com_coord_long", "com_coord_lat"), crs="WGS84")
+posi=st_intersection(pos, allgeo2) 
+
+posi=setDT(posi[, c("ID","icesdiv")])[,-3]
+setDF(posi)
+
+
+data_strandings_DEL=merge(data_strandings_DEL, posi, by="ID", all.x = T)
+
+
+
+
+
+
+pos=na.omit(data_strandings_PHO[,c("com_coord_lat","com_coord_long", "ID")])
+
+pos=st_as_sf(pos, coords = c("com_coord_long", "com_coord_lat"), crs="WGS84")
+posi=st_intersection(pos, allgeo2) 
+
+posi=setDT(posi[, c("ID","icesdiv")])[,-3]
+setDF(posi)
+
+
+data_strandings_PHO=merge(data_strandings_PHO, posi, by="ID", all.x = T)
+
+
+
+
+rm(list=c("pos", "posi"))
+
+
+
+
+
+
+
+setDT(data_strandings_DEL)
+setDT(data_strandings_PHO)
+
+
+
+
+
+# creation of an unique dataset containing stranding data for both harbour porpoise and common dolphin
+
+
+Strandings=rbind(data_strandings_DEL, data_strandings_PHO)
+
+Strandings[lb_nom=="Delphinus delphis", lb_nom:="Common dolphin"]
+Strandings[lb_nom=="Phocoena phocoena", lb_nom:="Harbour porpoise"]
+
+
+
+
+
+# Removal of data without any phenotypic measure:
+
+Strandings=Strandings[!is.na(SEXE) | !is.na(long_cm) | !is.na(poids_kg)]
+
+
+```
+
+
+## OBSMER data
+
+
+```{r OBSMER data}
+
+
+#### Extraction of data of interest:
+
+
+
+
+OBSMER_BYC<-read.csv2("CAPTURES.csv", fileEncoding="ISO-8859-3")
+
+
+setDT(OBSMER_BYC)
+
+
+
+OBSMER_BYC=OBSMER_BYC[ESPECE %in% c("Delphinus delphis", "Stenella coeruleoalba","Tursiops truncatus","Globicephala melas","Grampus griseus","Delphinidae","Phocoena phocoena"),] # selection of small cetacean species by-catch
+
+
+
+
+
+
+strat<-read.csv2("STRATEGIE.csv", fileEncoding="ISO-8859-3")
+
+setDT(strat)
+
+
+OBSMER_BYC=merge(OBSMER_BYC, strat[,.(ID_VRAC,ID_OP)], by="ID_VRAC", all.x = T, all.y=F) #retrieval of information on fishing activity during fishing operation
+
+
+
+
+operation<-read.csv2("OPERATION_PECHE.csv", fileEncoding="ISO-8859-3")
+
+setDT(operation)
+
+
+OBSMER_BYC=merge(OBSMER_BYC, operation, by="ID_OP", all.x = T, all.y=F) #retrieval of information on fishing operation
+
+OBSMER_BYC=OBSMER_BYC[str_detect(ZONE,"27"),] # selection of data from Northeast Atlantic ("27" ICES zone)
+
+
+
+
+
+marees<-read.csv2("MAREE.csv", fileEncoding="ISO-8859-3")
+
+setDT(marees)
+
+
+OBSMER_BYC=merge(OBSMER_BYC, marees, by="ID_MAREE", all.x = T, all.y=F)
+
+OBSMER_BYC=OBSMER_BYC[VALID_PROGRAMME=="Données exploitables",] # keeping only data validated by data curator
+
+
+
+
+
+
+# removing variables not used in subsequent analysis:
+
+OBSMER_BYC=OBSMER_BYC[ ,c("TYPE","TYPE.x","TYPE.y","ESPECE_COM","CAT","PRESENTATION","TAUX_ECH","WEIGHT_RTP","PRODUCT_DESTINATION","CONVERSION_COEFFICIENT","ALL_TAUX_ECH","METIER1","METIER2","METIER3","METIER_DCF6","DISPO_SELECT2","CAPTURE","MARINE_LITTER_LANDING") := NULL]
+
+
+#renaming confusing variables:
+
+
+colnames(OBSMER_BYC)[colnames(OBSMER_BYC) %in% c("COMMENTS", "DATE_FIN.x", "POIDS_REF_CAPT", "COMMENTAIRE.x", "DATE_DEBUT", "DATE_FIN.y", "COMMENTAIRE.y")]=c("COMMENTS_CAPT", "DATE_FIN_OP", "POIDS_REF_CAPT_OP", "COMMENTS_OP", "DATE_DEBUT_MAREE", "DATE_FIN_MAREE", "COMMENTS_MAREE")
+
+
+
+
+
+
+mesure<-read.csv2("MESURES.csv", fileEncoding="ISO-8859-3")
+
+setDT(mesure)
+
+
+OBSMER_BYC=merge(OBSMER_BYC, mesure[ID_CAPTURE %in% OBSMER_BYC$ID_CAPTURE,], by="ID_CAPTURE", all = T)  #retrieval of individual measurements
+
+
+
+
+
+# removing measured variables not used in subsequent analysis:
+
+OBSMER_BYC=OBSMER_BYC[ ,c("TYPE","TAUX_ECH","WEIGHT_RTP","VALEUR_ALPHANUMERIQUE") := NULL]
+
+
+
+
+
+#### retrieving catch weights of the fishing operation:
+
+
+capt<-read.csv2("CAPTURES.csv", fileEncoding="ISO-8859-3")
+setDT(capt)
+
+capt=merge(capt, strat[,.(ID_OP, ID_VRAC)])
+capt=capt[(ID_VRAC %in% strat[ID_OP %in% OBSMER_BYC$ID_OP, ID_VRAC]) & !(ID_CAPTURE %in% OBSMER_BYC$ID_CAPTURE)] #retrieving catch information (on all taxa other than small cetaceans) on all fishing operation with observed by-catch
+
+
+
+
+Code_FAO<-fread("ISIH-504549-espece_fao-20230320105303.txt") # table of correspondence between FAO nomenclature and taxa names
+
+
+
+
+
+
+capt=capt[!(str_detect(ESPECE, "Macrodéchets|Inerte|Cetorhinus maximus|Animaux|Halichoerus grypus|Uria aalge"))] #removing catch information on waste, other megafauna bycatch (not commercialized species), or undetermined taxa 
+
+
+# retrieving catch weight for each captured taxa
+
+capt[POIDS_REF=="", POIDS_REF:=WEIGHT_RTP]
+capt[, POIDS_REF:=as.numeric(POIDS_REF)]
+capt[, TAUX_ECH:=as.numeric(TAUX_ECH)]
+capt[, CONVERSION_COEFFICIENT:=as.numeric(CONVERSION_COEFFICIENT)]
+capt[, POIDS_REF:=(POIDS_REF/sapply(str_replace_all(str_replace_all(capt$ALL_TAUX_ECH, ",", "."), "#", "*"), function(x) eval(parse(text=x))))*CONVERSION_COEFFICIENT]
+
+
+# updating out of date taxa names:
+
+capt[ESPECE=="Trigloporus lastoviza", ESPECE:="Chelidonichthys lastoviza"]
+capt[ESPECE=="Rhombosepion orbignyanum", ESPECE:="Sepia orbignyana"]
+
+
+# For all taxa at the species level, retrieval of the higher order classification (spp.):
+
+capt[!(ESPECE %in% c("Thunnus","Lophius","Solea","Mugilidae","Mullus","Octopus","Liza","Sepia","Mustelus","Pisces","Actinopterygii","Chelidonichthys")) & !is.na(ESPECE), SPP:= 
+             capt[!(ESPECE %in% c("Thunnus","Lophius","Solea","Mugilidae","Mullus","Octopus","Liza","Sepia","Mustelus","Pisces","Actinopterygii","Chelidonichthys")) & !is.na(ESPECE), Code_FAO[ESPF_SCI_LIB==ESPECE, ESPF_PARENT_SCI_LIB], by=
+                          row.names(capt[!(ESPECE %in% c("Thunnus","Lophius","Solea","Mugilidae","Mullus","Octopus","Liza","Sepia","Mustelus","Pisces","Actinopterygii","Chelidonichthys")) & !is.na(ESPECE)])]$V1]
+
+
+# harmonizing nomenclature at the group of species (i.e. spp, mostly genus) level:
+
+capt[ESPECE=="Thunnus", SPP:= "Thunnus spp"]
+capt[ESPECE=="Solea", SPP:= "Solea spp"]
+capt[ESPECE=="Lophius", SPP:= "Lophius spp"]
+capt[ESPECE=="Mullus", SPP:= "Mullus spp"]
+capt[ESPECE=="Octopus", SPP:= "Octopus spp"]
+capt[ESPECE=="Liza", SPP:= "Liza spp"]
+capt[ESPECE=="Sepia", SPP:= "Sepia spp"]
+capt[ESPECE=="Mustelus", SPP:= "Mustelus spp"]
+capt[ESPECE=="Chelidonichthys", SPP:= "Chelidonichthys spp"]
+
+
+
+
+
+
+# For all taxa at the species level, retrieval of the family classification level:
+
+
+capt[!(ESPECE %in% c("Thunnus","Lophius","Solea","Mugilidae","Mullus","Octopus","Liza","Sepia","Mustelus","Pisces","Actinopterygii","Chelidonichthys")) & !is.na(ESPECE), FAMILY:= 
+             capt[!(ESPECE %in% c("Thunnus","Lophius","Solea","Mugilidae","Mullus","Octopus","Liza","Sepia","Mustelus","Pisces","Actinopterygii","Chelidonichthys")), Code_FAO[ESPF_SCI_LIB==ESPECE, FAMILLE], by=
+                          row.names(capt[!(ESPECE %in% c("Thunnus","Lophius","Solea","Mugilidae","Mullus","Octopus","Liza","Sepia","Mustelus","Pisces","Actinopterygii","Chelidonichthys"))])]$V1]
+
+
+# retrieval of family classification for data already registered at the group of species or family level:
+
+capt[ESPECE=="Thunnus", FAMILY:= "Scombridae"]
+capt[ESPECE=="Solea", FAMILY:= "Soleidae"]
+capt[ESPECE=="Lophius", FAMILY:= "Lophiidae"]
+capt[ESPECE=="Mullus", FAMILY:= "Mullidae"]
+capt[ESPECE=="Octopus", FAMILY:= "Octopodidae"]
+capt[ESPECE=="Liza", FAMILY:= "Mugilidae"]
+capt[ESPECE=="Sepia", FAMILY:= "Sepiidae"]
+capt[ESPECE=="Mustelus", FAMILY:= "Triakidae"]
+capt[ESPECE=="Chelidonichthys", FAMILY:= "Triglidae"]
+capt[ESPECE=="Mugilidae", FAMILY:= "Mugilidae"]
+
+
+
+
+
+
+# For all taxa at the species level, retrieval of the order classification level:
+
+
+capt[!(ESPECE %in% c("Thunnus","Lophius","Solea","Mugilidae","Mullus","Octopus","Liza","Sepia","Mustelus","Pisces","Actinopterygii","Chelidonichthys")) & !is.na(ESPECE), ORDER:= 
+             capt[!(ESPECE %in% c("Thunnus","Lophius","Solea","Mugilidae","Mullus","Octopus","Liza","Sepia","Mustelus","Pisces","Actinopterygii","Chelidonichthys")), Code_FAO[ESPF_SCI_LIB==ESPECE, ORDRE], by=
+                          row.names(capt[!(ESPECE %in% c("Thunnus","Lophius","Solea","Mugilidae","Mullus","Octopus","Liza","Sepia","Mustelus","Pisces","Actinopterygii","Chelidonichthys"))])]$V1]
+
+
+# retrieval of order classification for data already registered at the group of species or family level:
+
+capt[ESPECE=="Thunnus", ORDER:= "Perciformes"]
+capt[ESPECE=="Solea", ORDER:= "Pleuronectiformes"]
+capt[ESPECE=="Lophius", ORDER:= "Lophiiformes"]
+capt[ESPECE=="Mullus", ORDER:= "Perciformes"]
+capt[ESPECE=="Octopus", ORDER:= "Octopoda"]
+capt[ESPECE=="Liza", ORDER:= "Mugiliformes"]
+capt[ESPECE=="Sepia", ORDER:= "Sepiida"]
+capt[ESPECE=="Mustelus", ORDER:= "Carcharhiniformes"]
+capt[ESPECE=="Chelidonichthys", ORDER:= "Scorpaeniformes"]
+capt[ESPECE=="Mugilidae", ORDER:= "Mugiliformes"]
+
+
+
+
+
+
+# For all taxa at the species level, retrieval of the ISSCAAP FAO classification values:
+
+
+capt[!(ESPECE %in% c("Thunnus","Lophius","Solea","Mugilidae","Mullus","Octopus","Liza","Sepia","Mustelus","Pisces","Actinopterygii","Chelidonichthys")) & !is.na(ESPECE), ISSCAAP:= 
+             capt[!(ESPECE %in% c("Thunnus","Lophius","Solea","Mugilidae","Mullus","Octopus","Liza","Sepia","Mustelus","Pisces","Actinopterygii","Chelidonichthys")), Code_FAO[ESPF_SCI_LIB==ESPECE, ESPF_ISSCAP], by=
+                          row.names(capt[!(ESPECE %in% c("Thunnus","Lophius","Solea","Mugilidae","Mullus","Octopus","Liza","Sepia","Mustelus","Pisces","Actinopterygii","Chelidonichthys"))])]$V1]
+
+
+# retrieval of ISSCAAP FAO classification values for data already registered at the group of species or family level:
+
+capt[ESPECE=="Thunnus", ISSCAAP:= 36]
+capt[ESPECE=="Solea", ISSCAAP:= 31]
+capt[ESPECE=="Lophius", ISSCAAP:= 34]
+capt[ESPECE=="Mullus", ISSCAAP:= 33]
+capt[ESPECE=="Octopus", ISSCAAP:= 57]
+capt[ESPECE=="Liza", ISSCAAP:= 33]
+capt[ESPECE=="Sepia", ISSCAAP:= 57]
+capt[ESPECE=="Mustelus", ISSCAAP:= 38]
+capt[ESPECE=="Chelidonichthys", ISSCAAP:= 34]
+capt[ESPECE=="Mugilidae", ISSCAAP:= 33]
+
+
+
+
+
+# Computation of total catch weight per fishing operation:
+
+ poids_op = data.frame(POIDS_OP = tapply(capt$POIDS_REF,capt$ID_OP,  sumna), ID_OP = as.numeric(names(tapply(capt$POIDS_REF,capt$ID_OP,  sumna))))
+ 
+OBSMER_BYC = merge(OBSMER_BYC, poids_op, all=T, by="ID_OP")
+
+
+
+
+
+### retrieving main fished taxa (by weight, for each taxonomic level):
+
+
+capt[ESPECE=="Actinopterygii", POIDS_REF:=NA] # not considering unidentified fish in most fished taxa
+
+
+first_sp=dcast(capt,
+      ID_OP+ESPECE~., 
+      fun.aggregate = sumna,
+      value.var = "POIDS_REF")[!is.na(ESPECE) & !is.na(.)][,.(.==max(.),ESPECE),by = ID_OP][V1==T][!duplicated(ID_OP), .(ID_OP, ESPECE)]
+
+
+first_spp=dcast(capt,
+      ID_OP+SPP~., 
+      fun.aggregate = sumna,
+      value.var = "POIDS_REF")[!is.na(SPP) & !is.na(.)][,.(.==max(.),SPP),by = ID_OP][V1==T][!duplicated(ID_OP), .(ID_OP, SPP)]
+
+
+first_family=dcast(capt,
+      ID_OP+FAMILY~., 
+      fun.aggregate = sumna,
+      value.var = "POIDS_REF")[!is.na(FAMILY) & !is.na(.)][,.(.==max(.),FAMILY),by = ID_OP][V1==T][!duplicated(ID_OP), .(ID_OP, FAMILY)]
+
+
+first_order=dcast(capt,
+      ID_OP+ORDER~., 
+      fun.aggregate = sumna,
+      value.var = "POIDS_REF")[!is.na(ORDER) & !is.na(.)][,.(.==max(.),ORDER),by = ID_OP][V1==T][!duplicated(ID_OP), .(ID_OP, ORDER)]
+
+
+first_isscaap=dcast(capt,
+      ID_OP+ISSCAAP~., 
+      fun.aggregate = sumna,
+      value.var = "POIDS_REF")[!is.na(ISSCAAP) & !is.na(.)][,.(.==max(.),ISSCAAP),by = ID_OP][V1==T][!duplicated(ID_OP), .(ID_OP, ISSCAAP)]
+
+
+OBSMER_BYC=merge(OBSMER_BYC, first_sp, all=T, by="ID_OP", suffixes = c("", "_first"))
+OBSMER_BYC=merge(OBSMER_BYC, first_spp, all=T, by="ID_OP")
+OBSMER_BYC=merge(OBSMER_BYC, first_family, all=T, by="ID_OP")
+OBSMER_BYC=merge(OBSMER_BYC, first_order, all=T, by="ID_OP")
+OBSMER_BYC=merge(OBSMER_BYC, first_isscaap, all=T, by="ID_OP")
+
+
+
+
+
+
+# removing temporary variables:
+
+rm(list=c("marees","strat","mesure","capt","poids_op","first_sp","first_spp","first_family","first_order","first_isscaap", "Code_FAO"))
+gc()
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+# Discarding all groups with undistinguished individuals (i.e. not individually measured):
+
+
+OBSMER_BYC=OBSMER_BYC[is.na(NOMBRE.x) | NOMBRE.x==1]
+
+
+OBSMER_BYC=rbind(OBSMER_BYC[NOMBRE.y==1 | is.na(NOMBRE.y)], OBSMER_BYC[NOMBRE.y>1][rep(sequence(nrow(OBSMER_BYC[NOMBRE.y>1])), OBSMER_BYC[NOMBRE.y>1, NOMBRE.y]),]) # for the number indicated in measurements, number superior to one correspond to dolphin having the same measurements (we therefore repeated these lines)
+
+
+
+
+
+
+
+
+# Retrieving individual IDs for each measured individuals:
+
+
+
+# Important note: for individuals measured in groups, with the same capture ID, there is no way to associate multiple measures to the same individual (e.g. if both Circonference and Total Length are measured, there are no existing IDs to associate the two measures to one individual), in these cases we are currently forced to consider the different measures as different individuals.
+
+
+
+
+setorder(OBSMER_BYC, CRITERE)
+
+OBSMER_BYC[CRITERE=="Longueur standard", CRITERE:="Longueur totale (LT)"] # correcting an error in "CRITERE" denomination:
+
+
+u=c()
+for (i in unique(OBSMER_BYC$ID_CAPTURE)) {u=c(u,max(c(table(OBSMER_BYC[ID_CAPTURE==i,]$CRITERE),1)))} # u: number of individuals described per capture event
+unique(OBSMER_BYC$ID_CAPTURE)[u>1] # all capture events with more than one individual described
+
+
+cat=c()
+for (i in unique(OBSMER_BYC$ID_CAPTURE)) {cat=c(cat, length(unique(OBSMER_BYC[ID_CAPTURE==i,]$CRITERE)))} # for each capture event, number of measurements conducted 
+
+
+
+
+OBSMER_BYC$ID_IND=NA_character_
+
+
+
+for (i in 1:length(u)) {
+    if (u[i]==1 | (u[i]>1 & cat[i]==1)) {
+      for (j in 1:u[i]) {
+        OBSMER_BYC[ID_CAPTURE==unique(OBSMER_BYC$ID_CAPTURE)[i],][which(!duplicated(CRITERE))+(j-1),]$ID_IND=
+        paste(OBSMER_BYC[ID_CAPTURE==unique(OBSMER_BYC$ID_CAPTURE)[i],]$ID_CAPTURE[1],j, sep="_")
+      }
+    }
+    else {
+      for (j in 1:length(OBSMER_BYC[ID_CAPTURE==unique(OBSMER_BYC$ID_CAPTURE)[i], ID_CAPTURE])) {
+        OBSMER_BYC[ID_CAPTURE==unique(OBSMER_BYC$ID_CAPTURE)[i],][j,]$ID_IND=
+          paste(OBSMER_BYC[ID_CAPTURE==unique(OBSMER_BYC$ID_CAPTURE)[i],]$ID_CAPTURE[1],j, sep="_")
+      } # individuals measured in groups, with the same capture ID, and with multiple measures: considering the different measures as different individuals as we are not able to reliably assigned the different measurements to each individual
+    }
+}
+
+
+setorder(OBSMER_BYC, ANNEE, ID_NAVIRE, ID_MAREE, ID_OP, ID_CAPTURE, ID_IND) # reordering the dataset
+
+
+
+
+
+
+
+
+
+# correction of errors (visible from both measurements and associated comments):
+
+
+OBSMER_BYC[ID_OP=="111024597",]$ESPECE="Delphinidae" # error on dolphin identification: declared unidentifiable in comments
+
+
+OBSMER_BYC[ID_MAREE=="17862108",]$ESPECE="Stenella coeruleoalba" # error on dolphin identification: Stenella coreualba not delphinus delphis (comments and measurements)
+
+
+OBSMER_BYC[ID_MAREE=="20527097",]$ESPECE="Tursiops truncatus" # error on dolphin identification: Tursiops truncatus not delphinus delphis (comments and measurements)
+
+
+
+
+
+
+OBSMER_BYC[POIDS_REF.x %in% c("0.0", "10.0", "15.0", "999.0"), POIDS_REF.x:=""] # absurd values (also when compared to size measurements, which are much more reliable as weight are guess estimates)
+OBSMER_BYC[ESPECE=="Phocoena phocoena" & POIDS_REF.x=="150.0", POIDS_REF.x:=""] # discarding all data with individuals weighing more than 150 kg (range of values outside the weight ranges existing in natural conditions)
+
+
+u=c()
+for (i in unique(OBSMER_BYC$ID_CAPTURE)) {u=c(u,max(c(table(OBSMER_BYC[ID_CAPTURE==i,]$CRITERE),1)))}
+
+OBSMER_BYC[POIDS_REF.x!="" & !is.na(POIDS_REF.x) & ID_CAPTURE %in% unique(OBSMER_BYC$ID_CAPTURE)[u==1], POIDS_REF.y:=POIDS_REF.x] #when there is only one individual captured and no measure of individual weight, the capture weight value can be attributed to the individual
+
+
+OBSMER_BYC[POIDS_REF.y=="0.0", POIDS_REF.y:=""] # considering zero values as missing values
+
+
+
+OBSMER_BYC[ID_CAPTURE=="12982044" & CRITERE=="Photo de la capture", VALEUR:="115.0"] 
+OBSMER_BYC[ID_CAPTURE=="12982044" & CRITERE=="Photo de la capture", CRITERE:="Longueur totale (LT)"] # body size indicated in commentary (=raw data) 
+
+
+OBSMER_BYC[CRITERE=="Longueur totale (LT)" & VALEUR=="0.0", VALEUR:=""] # considering zero values as missing values
+
+
+OBSMER_BYC[CRITERE=="Circonférence (C)" & VALEUR=="0.0", VALEUR:=""] # considering zero values as missing values
+
+
+OBSMER_BYC[SEXE %in% c("", "Non sexe", "UNK"), SEXE:=NA]
+
+
+
+
+OBSMER_BYC[ID_CAPTURE==14998143 & VALEUR=="104.0", VALEUR:="188.0"]   #inversion of measures...
+OBSMER_BYC[ID_CAPTURE==14998143 & VALEUR=="188.0" & CRITERE=="Circonférence (C)", VALEUR:="104.0"]   #inversion of measures...
+
+
+
+# removal of 4 measures of circonference completely aberrant (<30cm for weight >100kg, or >180cm...)
+OBSMER_BYC[CRITERE=="Circonférence (C)" & as.numeric(VALEUR)<35, VALEUR:=""]
+OBSMER_BYC[CRITERE=="Circonférence (C)" & as.numeric(VALEUR)>170, VALEUR:=""]
+
+
+
+
+OBSMER_BYC[DISPO_REPULS=="", DISPO_REPULS:=NA]
+OBSMER_BYC[ETAT_MER=="", ETAT_MER:=NA]
+
+
+
+OBSMER_BYC$SEXE=as.factor(OBSMER_BYC$SEXE) # sex values considered as factor data
+OBSMER_BYC$ANNEE=as.character(OBSMER_BYC$ANNEE) # year of observation considered as a string variable
+OBSMER_BYC$ISSCAAP=as.character(OBSMER_BYC$ISSCAAP) # ISSCAAP classification considered as a string variable
+OBSMER_BYC$MAILL=as.numeric(OBSMER_BYC$MAILL) # mesh size considered as a numeric variable
+
+
+
+OBSMER_BYC[, Trimestre:=as.character(ceiling(as.numeric(str_sub(DATE_FIN_OP,4,5))/3))] # retrieving trimester of by-catch
+
+
+
+# retrieving fishing operation timing when hauling (i.e. when fishing operation ends):
+
+
+
+OBSMER_BYC$TIMING_OP=as.character(ceiling((hour(dmy_hms(OBSMER_BYC$DATE_FIN_OP))+1)/6))
+OBSMER_BYC[TIMING_OP==1, TIMING_OP:="Night"]
+OBSMER_BYC[TIMING_OP==2, TIMING_OP:="Morning"]
+OBSMER_BYC[TIMING_OP==3, TIMING_OP:="Afternoon"]
+OBSMER_BYC[TIMING_OP==4, TIMING_OP:="Evening"]
+
+
+
+
+
+
+OBSMER_BYC_Short_note=OBSMER_BYC[CRITERE=="Longueur totale (LT)" | (is.na(CRITERE) & !is.na(POIDS_REF.y)), .(ESPECE, SEXE, POIDS_REF.y, CRITERE, VALEUR, UNITE, ETAT_MER, DUREE_OP, ANNEE, Trimestre, ZONE, ENGIN, MAILL, EFFORT, DISPO_REPULS, PROF_ENGIN, GEAR_SPEED, POIDS_OP, ESPECE_CIBLE, ESPECE_first, SPP, FAMILY, ORDER, ISSCAAP, ID_IND, TIMING_OP)] # selection of all bycatch data with information on body length and/or body mass and/or sex; and of all variables used for subsequent analyses
+
+
+
+
+
+
+```
+
+
+
+
+
+
+## Checking for data replication
+
+
+```{r checking replication}
+
+
+
+
+#### overlap with other datasets:
+
+
+# trip IDs from declaration and observation datasets are not attributed the same way
+
+
+OBSMER_BYC$NAVS_COD_YEAR=paste(OBSMER_BYC$ID_NAVIRE, OBSMER_BYC$ANNEE, sep="_")
+
+probl_vessels=intersect(DECL_BYC$NAVS_COD_YEAR, OBSMER_BYC$NAVS_COD_YEAR) #some vessels with presence in both datasets
+
+
+
+#rapid checking in potential overlap to remove vessels with substantial doubts of replication in the data:
+
+OBSMER_BYC_simp=OBSMER_BYC[ESPECE=="Delphinus delphis", .(ID_OP, ID_MAREE, ID_NAVIRE, ANNEE, ESPECE, ZONE, RECTANGLE, PORT_DEBARQUEMENT_CODE, DATE_DEBUT_MAREE, DATE_FIN_MAREE, NAVS_COD_YEAR)][!duplicated(ID_OP),][NAVS_COD_YEAR %in% probl_vessels]
+
+
+
+#checking if there is any overlap between the two sources of data:
+
+
+
+OBSMER_BYC_simp$MAREE_ID=NA_integer_
+
+for (i in 1:length(OBSMER_BYC_simp$NAVS_COD_YEAR)) {
+  OBSMER_BYC_simp[i, MAREE_ID:=c(names(which.max(table(SACROIS[NAVS_COD_YEAR==OBSMER_BYC_simp[i, NAVS_COD_YEAR] & LIEU_COD_RET_SACROIS==OBSMER_BYC_simp[i, PORT_DEBARQUEMENT_CODE] & dmy_hms(DATE_SEQ)>=dmy_hms(OBSMER_BYC_simp[i, DATE_DEBUT_MAREE]) & dmy_hms(DATE_SEQ)<=dmy_hms(OBSMER_BYC_simp[i, DATE_FIN_MAREE]) & !duplicated(SEQ_ID), MAREE_ID]))), NA_integer_)[1]] #in case of overlapping trips: select the ones with the highest number of sequence included in target trip
+} # retrieving the most probable declaration fishing trip ID (on the basis of landing harbour and fishing trip timing) for each vessels of potential overlap between declaration and observation data
+
+
+# Important note: some trip IDs have no correspondence, probably due to SACROIS recomputation of trip 
+
+
+
+
+
+probl_tactics=intersect(DECL_BYC$MAREE_ID, OBSMER_BYC_simp$MAREE_ID) # all declaration fishing trip IDs potentially duplicated in declaration and observation datasets 
+
+probl_vessels=OBSMER_BYC_simp[is.na(MAREE_ID), NAVS_COD_YEAR] #vessels with no sufficient data to identify the fishing trip
+
+
+
+
+
+# cases to be removed to avoid any replication (removed from declaration data, as this dataset is less precise than the observation dataset):
+
+DECL_BYC_Short_note = DECL_BYC_Short_note[!(MAREE_ID %in% probl_tactics) & !(NAVS_COD_YEAR %in% probl_vessels), ]
+
+
+DECL_BYC_Short_note=DECL_BYC_Short_note[, .(ESP_LIB_FAO, QUANT_POIDS_VIF_CACC_DECLARES, AN, TRIMESTRE, SECT_COD_SACROIS_NIV3, ENGIN_COD, MAILLAGE, TARGET_TAXON)] # selection of all variables used for subsequent analyses
+
+```
+
+
+
+
+
+
+# Exportation of data for analyses
+
+
+
+```{r exportation data}
+
+# Strandings:
+
+Strandings 
+
+# Declaration data:
+
+Declaration_Bycatch = DECL_BYC_Short_note
+
+# Observation data (OBSMER programme):
+
+OBSMER_BYC_Short_note
+
+
+
+Table_correspondence = read.csv2("ISIH-504549-espece_fao-20230320105303.txt") # taxon correspondence table
+
+Declaration_Bycatch = merge(Declaration_Bycatch, Table_correspondence[, 1:2], by.x = "TARGET_TAXON", by.y = "ESPF_COD", all.x = T, all.y = F)
+OBSMER_BYC_Short_note = merge(OBSMER_BYC_Short_note[, TARGETED_TAXA_ID := str_split_i(ESPECE_CIBLE, " - ", 1)], Table_correspondence[, 1:2], by.x = "TARGETED_TAXA_ID", by.y = "ESPF_COD", all.x = T, all.y = F) # retrieving ISSCAAP id associated with targeted taxa
+
+
+
+
+
+### Using explicit English denominations for variables (and selection of variables used subsequently for analyses when necessary):
+
+
+Strandings = Strandings[, c("lb_nom", "date_mort_min", "date_mort_max", "Trimester", "YEAR", "icesdiv", "SEXE", "poids_kg", "long_cm")]
+
+colnames(Strandings) = c("SPECIES", "MIN_DATE_DEATH", "MAX_DATE_DEATH", "TRIMESTER", "YEAR", "ICES_DIV", "SEX", "BODY_MASS", "BODY_LENGTH")
+
+
+
+Declaration_Bycatch = Declaration_Bycatch[, .(ESP_LIB_FAO, TRIMESTRE, AN, SECT_COD_SACROIS_NIV3, ENGIN_COD, MAILLAGE, TARGET_TAXON, ESPF_ISSCAP, QUANT_POIDS_VIF_CACC_DECLARES)]
+
+colnames(Declaration_Bycatch) = c("SPECIES", "TRIMESTER", "YEAR", "ICES_DIV", "FISHING_GEAR", "MESH_SIZE", "TARGETED_TAXA", "TARGETED_ISSCAAP", "BODY_MASS")
+
+
+OBSMER_Bycatch = OBSMER_BYC_Short_note[, c("ESPECE", "Trimestre", "ANNEE",  "ZONE", "TIMING_OP", "ETAT_MER", "ENGIN", "MAILL", "EFFORT", "PROF_ENGIN", "GEAR_SPEED", "DISPO_REPULS", "DUREE_OP", "ESPECE_CIBLE", "ESPF_ISSCAP", "ESPECE_first", "SPP", "FAMILY", "ORDER", "ISSCAAP", "POIDS_OP", "SEXE", "POIDS_REF.y", "VALEUR")]
+
+colnames(OBSMER_Bycatch) = c("SPECIES", "TRIMESTER", "YEAR", "ICES_DIV", "TIMING_OP", "SEA_STATE", "FISHING_GEAR", "MESH_SIZE", "GEAR_DIMENSION", "GEAR_DEPTH", "GEAR_SPEED", "DETERRENT_DEVICE", "DURATION_OP", "TARGETED_TAXA", "TARGETED_ISSCAAP", "MOST_FISHED_SP", "MOST_FISHED_SPP", "MOST_FISHED_FAMILY", "MOST_FISHED_ORDER", "MOST_FISHED_ISSCAAP", "TOTAL_CATCH_WEIGHT", "SEX", "BODY_MASS", "BODY_LENGTH")
+
+
+
+
+
+
+# Harmonization of terminology:
+
+Strandings[SPECIES=="Common dolphin", SPECIES:="Delphinus delphis"]
+Strandings[SPECIES=="Harbour porpoise", SPECIES:="Phocoena phocoena"]
+
+
+Declaration_Bycatch[SPECIES=="Dauphin commun", SPECIES:="Delphinus delphis"]
+Declaration_Bycatch[SPECIES=="Marsouin commun", SPECIES:="Phocoena phocoena"]
+Declaration_Bycatch[SPECIES=="Dauphins nca", SPECIES:="Delphinidae"]
+Declaration_Bycatch[SPECIES=="Dauphin à flancs blancs Atlan.", SPECIES:="Lagenorhynchus acutus"]
+Declaration_Bycatch[SPECIES=="Dauphin bleu et blanc", SPECIES:="Stenella coeruleoalba"]
+Declaration_Bycatch[SPECIES=="Dauphin commun a bec large", SPECIES:="Delphinus capensis"]
+Declaration_Bycatch[SPECIES=="Dauphin tacheté de l'Atlantiq.", SPECIES:="Stenella frontalis"]
+Declaration_Bycatch[SPECIES=="Grand dauphin", SPECIES:="Tursiops truncatus"]
+
+
+Declaration_Bycatch[FISHING_GEAR=="GNS", FISHING_GEAR:="GNS - Set gillnets"]
+Declaration_Bycatch[FISHING_GEAR=="GTN", FISHING_GEAR:="GTN - Combined gillnets-trammel nets"]
+Declaration_Bycatch[FISHING_GEAR=="GTR", FISHING_GEAR:="GTR - Trammel nets"]
+Declaration_Bycatch[FISHING_GEAR=="OTB", FISHING_GEAR:="OTB - Single boat bottom otter trawls"]
+Declaration_Bycatch[FISHING_GEAR=="OTM", FISHING_GEAR:="OTM - Single boat midwater otter trawls"]
+Declaration_Bycatch[FISHING_GEAR=="PTM", FISHING_GEAR:="PTM - Midwater pair trawls"]
+Declaration_Bycatch[FISHING_GEAR=="SDN", FISHING_GEAR:="SDN - Danish seine"]
+
+
+OBSMER_Bycatch[FISHING_GEAR=="GNS - Filets maillants calés (ancrés, filets maillants de fond à une nappe)", FISHING_GEAR:="GNS - Set gillnets"]
+OBSMER_Bycatch[FISHING_GEAR=="GTR - Trémails", FISHING_GEAR:="GTR - Trammel nets"]
+OBSMER_Bycatch[FISHING_GEAR=="OTT - Chaluts jumeaux à panneaux", FISHING_GEAR:="OTT - Twin bottom otter trawls"]
+OBSMER_Bycatch[FISHING_GEAR=="OTB - Chaluts de fond à panneaux", FISHING_GEAR:="OTB - Single boat bottom otter trawls"]
+OBSMER_Bycatch[FISHING_GEAR=="OTM - Chaluts pélagiques à panneaux", FISHING_GEAR:="OTM - Single boat midwater otter trawls"]
+OBSMER_Bycatch[FISHING_GEAR=="PTM - Chaluts boeufs pélagiques", FISHING_GEAR:="PTM - Midwater pair trawls"]
+OBSMER_Bycatch[FISHING_GEAR=="PTB - Chaluts boeufs de fond", FISHING_GEAR:="PTB - Bottom pair trawls"]
+OBSMER_Bycatch[FISHING_GEAR=="SDN - Sennes de fond danoise", FISHING_GEAR:="SDN - Danish seine"]
+OBSMER_Bycatch[FISHING_GEAR=="PS - Filets tournants avec coulisse (sennes coulissantes)", FISHING_GEAR:="PS - Purse seines"]
+OBSMER_Bycatch[FISHING_GEAR=="LLS - Palangres calées (fixes)", FISHING_GEAR:="LLS - Set longlines"]
+
+
+
+Declaration_Bycatch[, TARGETED_ISSCAAP := as.character(TARGETED_ISSCAAP)]
+Declaration_Bycatch[TARGETED_ISSCAAP=="31", TARGETED_ISSCAAP:="31 - Pleuronectiformes"]
+Declaration_Bycatch[TARGETED_ISSCAAP=="32", TARGETED_ISSCAAP:="32 - Gadiformes"]
+Declaration_Bycatch[TARGETED_ISSCAAP=="33", TARGETED_ISSCAAP:="33 - Miscellaneous coastal fishes"]
+Declaration_Bycatch[TARGETED_ISSCAAP=="34", TARGETED_ISSCAAP:="34 - Miscellaneous demersal fishes"]
+Declaration_Bycatch[TARGETED_ISSCAAP=="36", TARGETED_ISSCAAP:="36 - Tunas, bonitos"]
+Declaration_Bycatch[TARGETED_ISSCAAP=="39", TARGETED_ISSCAAP:=NA_character_]
+Declaration_Bycatch[TARGETED_ISSCAAP=="57", TARGETED_ISSCAAP:="57 - Squids, cuttlefishes, octopuses"]
+
+
+OBSMER_Bycatch[, TARGETED_ISSCAAP := as.character(TARGETED_ISSCAAP)]
+OBSMER_Bycatch[TARGETED_ISSCAAP=="31", TARGETED_ISSCAAP:="31 - Pleuronectiformes"]
+OBSMER_Bycatch[TARGETED_ISSCAAP=="32", TARGETED_ISSCAAP:="32 - Gadiformes"]
+OBSMER_Bycatch[TARGETED_ISSCAAP=="33", TARGETED_ISSCAAP:="33 - Miscellaneous coastal fishes"]
+OBSMER_Bycatch[TARGETED_ISSCAAP=="34", TARGETED_ISSCAAP:="34 - Miscellaneous demersal fishes"]
+OBSMER_Bycatch[TARGETED_ISSCAAP=="35", TARGETED_ISSCAAP:="35 - Herrings, sardines, anchovies"]
+OBSMER_Bycatch[TARGETED_ISSCAAP=="36", TARGETED_ISSCAAP:="36 - Tunas, bonitos"]
+OBSMER_Bycatch[TARGETED_ISSCAAP=="37", TARGETED_ISSCAAP:="37 - Miscellaneous pelagic fishes"]
+OBSMER_Bycatch[TARGETED_ISSCAAP=="38", TARGETED_ISSCAAP:="38 - Sharks, rays"]
+OBSMER_Bycatch[TARGETED_ISSCAAP=="39", TARGETED_ISSCAAP:=NA_character_]
+OBSMER_Bycatch[TARGETED_ISSCAAP=="43", TARGETED_ISSCAAP:="43 - Lobsters, spiny-rock lobsters"]
+OBSMER_Bycatch[TARGETED_ISSCAAP=="57", TARGETED_ISSCAAP:="57 - Squids, cuttlefishes, octopuses"]
+
+
+
+OBSMER_Bycatch[MOST_FISHED_ISSCAAP==31, MOST_FISHED_ISSCAAP:="31 - Pleuronectiformes"]
+OBSMER_Bycatch[MOST_FISHED_ISSCAAP==32, MOST_FISHED_ISSCAAP:="32 - Gadiformes"]
+OBSMER_Bycatch[MOST_FISHED_ISSCAAP==33, MOST_FISHED_ISSCAAP:="33 - Miscellaneous coastal fishes"]
+OBSMER_Bycatch[MOST_FISHED_ISSCAAP==34, MOST_FISHED_ISSCAAP:="34 - Miscellaneous demersal fishes"]
+OBSMER_Bycatch[MOST_FISHED_ISSCAAP==35, MOST_FISHED_ISSCAAP:="35 - Herrings, sardines, anchovies"]
+OBSMER_Bycatch[MOST_FISHED_ISSCAAP==36, MOST_FISHED_ISSCAAP:="36 - Tunas, bonitos"]
+OBSMER_Bycatch[MOST_FISHED_ISSCAAP==37, MOST_FISHED_ISSCAAP:="37 - Miscellaneous pelagic fishes"]
+OBSMER_Bycatch[MOST_FISHED_ISSCAAP==38, MOST_FISHED_ISSCAAP:="38 - Sharks, rays"]
+OBSMER_Bycatch[MOST_FISHED_ISSCAAP==42, MOST_FISHED_ISSCAAP:="45 - Crabs, sea-spiders"]
+OBSMER_Bycatch[MOST_FISHED_ISSCAAP==43, MOST_FISHED_ISSCAAP:="43 - Lobsters, spiny-rock lobsters "]
+OBSMER_Bycatch[MOST_FISHED_ISSCAAP==57, MOST_FISHED_ISSCAAP:="57 - Squids, cuttlefishes, octopuses"]
+
+
+
+
+
+Declaration_Bycatch[TARGETED_TAXA=="BFT", TARGETED_TAXA:="BFT - Thunnus thynnus"]
+Declaration_Bycatch[TARGETED_TAXA=="BSE", TARGETED_TAXA:="BSE - Dicentrarchus spp"]
+Declaration_Bycatch[TARGETED_TAXA=="CTL", TARGETED_TAXA:="CTL - Sepiidae, Sepiolidae"]
+Declaration_Bycatch[TARGETED_TAXA=="GAD", TARGETED_TAXA:="GAD - Gadiformes"]
+Declaration_Bycatch[TARGETED_TAXA=="HKE", TARGETED_TAXA:="HKE - Merluccius merluccius"]
+Declaration_Bycatch[TARGETED_TAXA=="MNZ", TARGETED_TAXA:="MNZ - Lophius spp"]
+Declaration_Bycatch[TARGETED_TAXA=="MZZ", TARGETED_TAXA:="MZZ - Osteichthyes"]
+Declaration_Bycatch[TARGETED_TAXA=="POL", TARGETED_TAXA:="POL - Pollachius pollachius"]
+Declaration_Bycatch[TARGETED_TAXA=="SBG", TARGETED_TAXA:="SBG - Sparus aurata"]
+Declaration_Bycatch[TARGETED_TAXA=="SOX", TARGETED_TAXA:="SOX - Soleidae"]
+Declaration_Bycatch[TARGETED_TAXA=="SQU", TARGETED_TAXA:="SQU - Loliginidae, Ommastrephidae"]
+Declaration_Bycatch[TARGETED_TAXA=="TUR", TARGETED_TAXA:="TUR - Scophthalmus maximus"]
+
+
+
+OBSMER_Bycatch[TARGETED_TAXA=="ALB - Thon germon", TARGETED_TAXA:="ALB - Thunnus alalunga "]
+OBSMER_Bycatch[TARGETED_TAXA=="BFT - Thon rouge", TARGETED_TAXA:="BFT - Thunnus thynnus"]
+OBSMER_Bycatch[TARGETED_TAXA=="BSE - Bars", TARGETED_TAXA:="BSE - Dicentrarchus spp"]
+OBSMER_Bycatch[TARGETED_TAXA=="BSS - Bar commun", TARGETED_TAXA:="BSS - Dicentrarchus labrax"]
+OBSMER_Bycatch[TARGETED_TAXA=="BZX - Bonites (divers)", TARGETED_TAXA:="BZX - Sarda spp"]
+OBSMER_Bycatch[TARGETED_TAXA=="CTL - Seiches, sépioles nca", TARGETED_TAXA:="CTL - Sepiidae, Sepiolidae"]
+OBSMER_Bycatch[TARGETED_TAXA=="FLX - Poissons plats", TARGETED_TAXA:="FLX - Pleuronectiformes"]
+OBSMER_Bycatch[TARGETED_TAXA=="GAD - Gadidés", TARGETED_TAXA:="GAD - Gadiformes"]
+OBSMER_Bycatch[TARGETED_TAXA=="HKE - Merlu européen", TARGETED_TAXA:="HKE - Merluccius merluccius"]
+OBSMER_Bycatch[TARGETED_TAXA=="HKX - Merlus (divers)", TARGETED_TAXA:="HKX - Merluccius spp"]
+OBSMER_Bycatch[TARGETED_TAXA=="JAX - Chinchards (divers)", TARGETED_TAXA:="JAX - Trachurus spp"]
+OBSMER_Bycatch[TARGETED_TAXA=="JOD - Saint-Pierre", TARGETED_TAXA:="JOD - Zeus faber"]
+OBSMER_Bycatch[TARGETED_TAXA=="MAX - Maquereaux (divers)", TARGETED_TAXA:="MAX - Scomber spp"]
+OBSMER_Bycatch[TARGETED_TAXA=="MGR - Maigre", TARGETED_TAXA:="MGR - Argyrosomus regius"]
+OBSMER_Bycatch[TARGETED_TAXA=="MNZ - Baudroies (= Lottes) (divers)", TARGETED_TAXA:="MNZ - Lophius spp"]
+OBSMER_Bycatch[TARGETED_TAXA=="MZZ - Poissons", TARGETED_TAXA:="MZZ - Osteichthyes"]
+OBSMER_Bycatch[TARGETED_TAXA=="NEP - Langoustine commune", TARGETED_TAXA:="NEP - Nephrops norvegicus"]
+OBSMER_Bycatch[TARGETED_TAXA=="PIL - Sardine commune", TARGETED_TAXA:="PIL - Sardina pilchardus"]
+OBSMER_Bycatch[TARGETED_TAXA=="POL - Lieu jaune", TARGETED_TAXA:="POL - Pollachius pollachius"]
+OBSMER_Bycatch[TARGETED_TAXA=="RAJ - Raies (divers)", TARGETED_TAXA:="RAJ - Rajidae"]
+OBSMER_Bycatch[TARGETED_TAXA=="SBX - Dorades, Sparidés", TARGETED_TAXA:="SBX - Sparidae"]
+OBSMER_Bycatch[TARGETED_TAXA=="SOX - Soles (divers)", TARGETED_TAXA:="SOX - Soleidae"]
+OBSMER_Bycatch[TARGETED_TAXA=="SQU - Calmars, Encornets", TARGETED_TAXA:="SQU - Loliginidae, Ommastrephidae"]
+OBSMER_Bycatch[TARGETED_TAXA=="TUN - Thons (divers)", TARGETED_TAXA:="TUN - Thunnini"]
+OBSMER_Bycatch[TARGETED_TAXA=="TUR - Turbot", TARGETED_TAXA:="TUR - Scophthalmus maximus"]
+OBSMER_Bycatch[TARGETED_TAXA=="WHG - Merlan", TARGETED_TAXA:="WHG - Merlangius merlangus"]
+
+
+
+
+OBSMER_Bycatch[SEA_STATE=="", SEA_STATE:=NA]
+OBSMER_Bycatch[SEA_STATE=="0 - calme, vagues absentes", SEA_STATE:="0 - Calm (glassy)"]
+OBSMER_Bycatch[SEA_STATE=="1 - ridée, vagues de 0 à 0.1 mètres", SEA_STATE:="1 - Calm (rippled)"]
+OBSMER_Bycatch[SEA_STATE=="2 - belle, vagues de 0.1 à 0.5 mètres", SEA_STATE:="2 - Smooth"]
+OBSMER_Bycatch[SEA_STATE=="3 - peu agitée, vagues de 0.5 à 1.25 mètres", SEA_STATE:="3 - Slight"]
+OBSMER_Bycatch[SEA_STATE=="4 - agitée, vagues de 1.25 à 2.5 mètres", SEA_STATE:="4 - Moderate"]
+OBSMER_Bycatch[SEA_STATE=="5 - forte, vagues de 2.5 à 4 mètres", SEA_STATE:="5 - Rough"]
+OBSMER_Bycatch[SEA_STATE=="6 - très forte, vagues de 4 à 6 mètres", SEA_STATE:="6 - Very rough"]
+
+
+OBSMER_Bycatch[DETERRENT_DEVICE=="Oui", DETERRENT_DEVICE:=TRUE]
+OBSMER_Bycatch[DETERRENT_DEVICE=="Non", DETERRENT_DEVICE:=FALSE]
+
+
+
+OBSMER_Bycatch[MOST_FISHED_SP=="Lophius", MOST_FISHED_SP:="Lophius spp"]
+OBSMER_Bycatch[MOST_FISHED_SP=="Solea", MOST_FISHED_SP:="Solea spp"]
+OBSMER_Bycatch[MOST_FISHED_SP=="Thunnus", MOST_FISHED_SP:="Thunnus spp"]
+
+
+OBSMER_Bycatch[TIMING_OP=="Afternoon", TIMING_OP:="Afternoon (12:00 - 18:00)"]
+OBSMER_Bycatch[TIMING_OP=="Evening", TIMING_OP:="Evening (18:00 - 00:00)"]
+OBSMER_Bycatch[TIMING_OP=="Morning", TIMING_OP:="Morning (06:00 - 12:00)"]
+OBSMER_Bycatch[TIMING_OP=="Night", TIMING_OP:="Night (00:00 - 06:00)"]
+
+OBSMER_Bycatch[SEX=="Femelle", SEX:="Female"]
+OBSMER_Bycatch[SEX=="Male", SEX:="Male"]
+
+
+
+
+
+# Harmonization of variable format:
+
+
+str(Strandings)
+str(Declaration_Bycatch)
+str(OBSMER_Bycatch)
+
+Declaration_Bycatch[, TRIMESTER:=as.character(TRIMESTER)]
+Declaration_Bycatch[, YEAR:=as.character(YEAR)]
+OBSMER_Bycatch[, TRIMESTER:=as.character(TRIMESTER)]
+OBSMER_Bycatch[, YEAR:=as.character(YEAR)]
+OBSMER_Bycatch[, GEAR_SPEED:=as.numeric(GEAR_SPEED)]
+OBSMER_Bycatch[, DETERRENT_DEVICE:=as.logical(DETERRENT_DEVICE)]
+OBSMER_Bycatch[, BODY_MASS:=as.numeric(BODY_MASS)]
+OBSMER_Bycatch[, BODY_LENGTH:=as.numeric(BODY_LENGTH)]
+
+
+
+
+
+
+# Observation effort data (OBSMER) by external variables:
+
+
+observation_effort = setDT(operation[, c("DUREE_OP", "ZONE", "DATE_FIN", "ETAT_MER")])
+
+colnames(observation_effort) = c("DURATION_OP", "ICES_DIV", "END_TIMING", "SEA_STATE")
+
+observation_effort[SEA_STATE=="", SEA_STATE:=NA]
+observation_effort[SEA_STATE=="0 - calme, vagues absentes", SEA_STATE:="0 - Calm (glassy)"]
+observation_effort[SEA_STATE=="1 - ridée, vagues de 0 à 0.1 mètres", SEA_STATE:="1 - Calm (rippled)"]
+observation_effort[SEA_STATE=="2 - belle, vagues de 0.1 à 0.5 mètres", SEA_STATE:="2 - Smooth"]
+observation_effort[SEA_STATE=="3 - peu agitée, vagues de 0.5 à 1.25 mètres", SEA_STATE:="3 - Slight"]
+observation_effort[SEA_STATE=="4 - agitée, vagues de 1.25 à 2.5 mètres", SEA_STATE:="4 - Moderate"]
+observation_effort[SEA_STATE=="5 - forte, vagues de 2.5 à 4 mètres", SEA_STATE:="5 - Rough"]
+observation_effort[SEA_STATE=="6 - très forte, vagues de 4 à 6 mètres", SEA_STATE:="6 - Very rough"]
+
+
+
+
+
+# exporting dataset used for subsequent analyses:
+
+
+saveRDS(observation_effort, "observation_effort.rds")
+saveRDS(Strandings, "Strandings_journal_version.rds")
+saveRDS(Declaration_Bycatch, "Declaration_Bycatch_journal_version.rds")
+saveRDS(OBSMER_Bycatch, "OBSMER_Bycatch_journal_version.rds")
+
+
+write.csv(Strandings, "Strandings_journal_version.csv", row.names = F)
+write.csv(Declaration_Bycatch, "Declaration_Bycatch_journal_version.csv", row.names = F)
+write.csv(OBSMER_Bycatch, "OBSMER_Bycatch_journal_version.csv", row.names = F)
+
+
+```
+
+
+
+
