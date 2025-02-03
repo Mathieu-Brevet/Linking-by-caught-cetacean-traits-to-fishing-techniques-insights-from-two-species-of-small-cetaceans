@@ -23,8 +23,8 @@ library(emmeans)#comparison of marginal means from GLM
 library(sf) #spatial operations
 
 
-library(texreg) #export table in Latex format
-library(kableExtra)
+library(texreg) 
+library(kableExtra) #export table in Latex format
 
 
 
@@ -68,17 +68,17 @@ OBSMER_Bycatch[, TRIMESTER := as.character(TRIMESTER)] # converting trimester in
 
 
 Declaration_Bycatch[TARGETED_TAXA == "MZZ - Osteichthyes", TARGETED_TAXA:=NA]
-OBSMER_Bycatch[TARGETED_TAXA == "MZZ - Osteichthyes", TARGETED_TAXA:=NA] # we considered the declarations of Osteichtyes to be equivalent to DECLARATIONS OF an unknown taxon, and therefore considered these values equivalent to NA for our analyses
+OBSMER_Bycatch[TARGETED_TAXA == "MZZ - Osteichthyes", TARGETED_TAXA:=NA] # we considered the declarations of Osteichtyes to be equivalent to declarations of an unknown taxon, and therefore considered these values equivalent to NA for our analyses
 
 
 
 
-# Merging data in common between declaration and observation datasets:
+# Merging data shared by declaration and observation datasets:
 
 Decl_Obs_Merged_Bycatch = rbind( cbind(Declaration_Bycatch[!is.na(BODY_MASS), .(SPECIES, ICES_DIV, TRIMESTER, YEAR, FISHING_GEAR, MESH_SIZE, TARGETED_TAXA, TARGETED_ISSCAAP, BODY_MASS)], ORIGIN= "DECL"), cbind(OBSMER_Bycatch[!is.na(BODY_MASS), .(SPECIES, ICES_DIV, TRIMESTER, YEAR, FISHING_GEAR, MESH_SIZE, TARGETED_TAXA, TARGETED_ISSCAAP, BODY_MASS)], ORIGIN= "OBSMER"), use.names=F)
 
 
-# Merging data in common between declaration and observation datasets, by only considering explanatory variables:
+# Merging data shared by declaration and observation datasets, but only considering explanatory variables:
 
 Decl_Obs_Merged_Bycatch_explanatory = rbind( cbind(Declaration_Bycatch[, .(SPECIES, ICES_DIV, TRIMESTER, YEAR, FISHING_GEAR, MESH_SIZE, TARGETED_TAXA, TARGETED_ISSCAAP)], ORIGIN= "DECL"), cbind(OBSMER_Bycatch[, .(SPECIES, ICES_DIV, TRIMESTER, YEAR, FISHING_GEAR, MESH_SIZE, TARGETED_TAXA, TARGETED_ISSCAAP)], ORIGIN= "OBSMER"), use.names=F)
 
@@ -228,7 +228,7 @@ table(Strandings$SPECIES, Strandings$ICES_DIV)
 
 
 
-# Maps of corrected abundance:
+# Map of corrected abundance:
 
 
 
@@ -241,7 +241,7 @@ observation_effort_spat$icesdiv=rownames(observation_effort_spat)
 
 allgeo <- readRDS("~/allgeo.rds") # spatial information file
 
-allgeo=allgeo[allgeo$offname %in% c("27.4.c", "27.7.d", "27.7.e", "27.7.f", "27.7.g", "27.7.h", "27.7.j", "27.7.k", "27.8.a", "27.8.b", "27.8.c", "27.8.d"),] #selection of only ices division along the French coast
+allgeo=allgeo[allgeo$offname %in% c("27.4.c", "27.7.d", "27.7.e", "27.7.f", "27.7.g", "27.7.h", "27.7.j", "27.7.k", "27.8.a", "27.8.b", "27.8.c", "27.8.d"),] #selection of sampled ices divisions 
 
 
 
@@ -491,9 +491,9 @@ ggsave("Figure_S7.pdf", device = "pdf", units = "in", width = 14, height = 8.5)
 
 # Phenotypic sensitivity to bycatch
 
-We have separated the analysis of stranding data from the declaration and observation data because they may be partially redundant (with no way to verify this), and because their collection is fundamentally different (only some of the captured dolphins strand, whereas theoretically we should detect all captures through observation and reporting).  
+We have separated the analysis of stranding data from the declaration and observation data because they may be partially redundant (with no way to verify this), and because their collection is fundamentally different (only some of the captured dolphins actually strand, whereas theoretically we should detect all captures through observation and reporting).  
 
-For each data sets, we first described the distribution of studied traits and compared the trait values of by-caught and stranded individuals with key population values reported in the literature for each of the species studied (for both sexes: body length at maturity, asymptotic adult body length). We then examined whether different phenotypic sensitivity profiles emerged in space or time by implementing a generalised linear model for each of the traits studied (linear model for body length, logistic regression for sex) as a function of year, trimester and ICES division of by-catch.
+For each dataset, we first described the distribution of studied traits and compared the trait values of by-caught and stranded individuals with key population values reported in the literature for each of the species studied (for both sexes: body length at maturity, asymptotic adult body length). We then examined whether different phenotypic sensitivity profiles emerged in space or time by implementing a generalised linear model for each of the traits studied (linear model for body length, logistic regression for sex) as a function of year, trimester and ICES division of by-catch.
 
 
 
@@ -508,7 +508,7 @@ For each data sets, we first described the distribution of studied traits and co
 ```{r sensitivity stranding - distribution comparison}
 
 
-# Creation of datasets per species:
+# Creation of species-specific datasets:
 
 data_strandings_PHO = Strandings[SPECIES == "Phocoena phocoena"]
 data_strandings_DEL = Strandings[SPECIES == "Delphinus delphis"]
@@ -571,7 +571,8 @@ biblio = data.frame(ref = c("Murphy et al. 2021", "Murphy et al. 2021", "Murphy 
                     param = c("Sexual maturity\n(males, Delphinus delphis)", "Sexual maturity\n(females, Delphinus delphis)", "Asymptotic length\n(males, Delphinus delphis)", "Asymptotic length\n(females, Delphinus delphis)", "Sexual maturity\n(males, Delphinus delphis)", "Sexual maturity\n(females, Delphinus delphis)", "Asymptotic length\n(males, Delphinus delphis)", "Asymptotic length\n(females, Delphinus delphis)","Sexual maturity\n(males, Phocoena phocoena)", "Sexual maturity\n(females, Phocoena phocoena)", "Asymptotic length\n(males, Phocoena phocoena)", "Asymptotic length\n(females, Phocoena phocoena)", "Sexual maturity\n(males, Phocoena phocoena)", "Sexual maturity\n(females, Phocoena phocoena)", "Asymptotic length\n(males, Phocoena phocoena)", "Asymptotic length\n(females, Phocoena phocoena)"),
                     VALEUR = c(206, 188, 211, 197, 200, 190, 209, 206, 127, 138, 141, 153, 135, 147, 149, 163))
 
-# key population values reported in the literature for each of the species studied (for both sexes: body length at maturity, asymptotic adult body length)
+# biblio: key population values reported in the literature for each of the species studied (for both sexes: body length at maturity, asymptotic adult body length)
+
 
 
 
@@ -709,7 +710,7 @@ table(data_strandings_PHO$TRIMESTER)
 table(data_strandings_DEL$ICES_DIV)
 table(data_strandings_PHO$ICES_DIV)
 
-# some years appears quite rarely and the number of categories associated with the variable is high
+# some years appear quite rarely and the number of categories associated with the variable is high
 
 
 ### we grouped year (4-year periods, except for the last three years) to facilitate interpretations and avoid cases with too few data:
@@ -803,7 +804,7 @@ plot(cooks.distance(SPT_sensitivity_DEL_sex) )
   # Size:
 
 
-# only model on size are performed because this measure is systematically performed for stranded individuals (contrary to weight) and more reliable in this specific case
+# only model on size are performed because this measure is systematically performed for stranded individuals (contrary to weight) and more reliable in our specific case (body mass values are guess estimations)
 
 # Models on body size were performed for both sex separately to account for potential sex-specific spatio-temporal sensitivity profiles
 
@@ -996,7 +997,7 @@ plot(cooks.distance(SPT_sensitivity_PHO_sex) )
   # Size:
 
 
-# only model on size are performed because this measure is systematically performed for stranded individuals (contrary to weight) and more reliable in this specific case
+# only model on size are performed because this measure is systematically performed for stranded individuals (contrary to weight) and more reliable in our specific case
 
 # Models on body size were performed for both sex separately to account for potential sex-specific spatio-temporal sensitivity profiles
 
@@ -1193,7 +1194,7 @@ kable_classic(add_header_above(kbl(TableS2, format = "latex", vline= ""), c("", 
 
 
 
-### Table combining pairwise contrast comparison test for each significant variable either in models studying sex distribution (S3) or size distribution (S4):
+### Table combining pairwise contrast comparison tests for each significant variable either in models studying sex distribution (S3) or size distribution (S4):
 
 
 TableS3 = rbind( 
@@ -1492,7 +1493,7 @@ table(Decl_Obs_Merged_Bycatch[SPECIES == "Delphinus delphis"]$ICES_DIV)
 table(Decl_Obs_Merged_Bycatch[SPECIES == "Phocoena phocoena"]$ICES_DIV)
 
 
-# The distribution of the number of captures per ICES division is highly variable, with some underrepresented divisions. Due to rare categories and the fact that the sample size of recorded captures is too small to support analyses with categorical variables described by a high number of classes, we decided to group years into four different groups.
+# The distribution of the number of captures per ICES division is highly variable, with some underrepresented divisions. Due to rare categories and the fact that the sample size of recorded captures is too small to support analyses with categorical variables described by a high number of classes, we decided to group ICES divisions into four different groups.
 
 
 table(OBSMER_Bycatch[SPECIES == "Delphinus delphis"]$YEAR)
@@ -1615,7 +1616,7 @@ table(OBSMER_Bycatch[!is.na(BODY_LENGTH) & SPECIES %in% c("Delphinus delphis", "
 
 table(OBSMER_Bycatch[!is.na(SEX) & SPECIES == "Delphinus delphis"]$ICES_DIV_grouped)
 fisher.test(OBSMER_Bycatch[!is.na(SEX) & SPECIES == "Delphinus delphis"]$SEX, OBSMER_Bycatch[!is.na(SEX) & SPECIES == "Delphinus delphis"]$ICES_DIV_grouped)
-table(OBSMER_Bycatch[!is.na(SEX) & SPECIES == "Delphinus delphis"]$SEX, OBSMER_Bycatch[!is.na(SEX) & SPECIES == "Delphinus delphis"]$ICES_DIV_grouped) # more female capture north of the bay of Biscay (not significant)
+table(OBSMER_Bycatch[!is.na(SEX) & SPECIES == "Delphinus delphis"]$SEX, OBSMER_Bycatch[!is.na(SEX) & SPECIES == "Delphinus delphis"]$ICES_DIV_grouped) # more female captured north of the bay of Biscay (not significant)
 
 
 ggplot(dcast(OBSMER_Bycatch[!is.na(SEX) & SPECIES == "Delphinus delphis"], SEX + ICES_DIV_grouped ~ ., fun.aggregate = length), aes( x = ICES_DIV_grouped, y = .)) +
@@ -1647,7 +1648,7 @@ fisher.test(OBSMER_Bycatch[!is.na(SEX) & SPECIES == "Delphinus delphis"]$SEX, OB
 
 
 
-# Prior to spatio-temporal test we checked whether body mass variation depended on the data sources:
+# Prior to spatio-temporal tests we checked whether body mass variation depended on the data sources:
 
 table(Decl_Obs_Merged_Bycatch[SPECIES == "Delphinus delphis"]$ORIGIN)
 kruskal.test(Decl_Obs_Merged_Bycatch[SPECIES == "Delphinus delphis"]$BODY_MASS ~ Decl_Obs_Merged_Bycatch[SPECIES == "Delphinus delphis"]$ORIGIN)
@@ -1758,7 +1759,7 @@ fisher.test(OBSMER_Bycatch[!is.na(SEX) & SPECIES == "Phocoena phocoena"]$SEX, OB
 
 
 
-# Prior to spatio-temporal test we checked whether body mass variation depended on the data sources:
+# Prior to spatio-temporal tests we checked whether body mass variation depended on the data sources:
 
 table(Decl_Obs_Merged_Bycatch[SPECIES == "Phocoena phocoena"]$ORIGIN)
 kruskal.test(Decl_Obs_Merged_Bycatch[SPECIES == "Phocoena phocoena"]$BODY_MASS ~ Decl_Obs_Merged_Bycatch[SPECIES == "Phocoena phocoena"]$ORIGIN)
@@ -1816,7 +1817,7 @@ kruskal.test(OBSMER_Bycatch[!is.na(BODY_LENGTH) & SPECIES == "Phocoena phocoena"
 
 table(OBSMER_Bycatch[SPECIES == "Delphinus delphis"]$SEA_STATE)
 table(OBSMER_Bycatch[SPECIES == "Phocoena phocoena"]$SEA_STATE)
-# as their is some sea state categories with too little data (highest and lowest sea state measured) we grouped the most extreme conditions together for analyses:
+# as there is some sea state categories with too little data (highest and lowest sea state measured) we grouped the most extreme conditions together for analyses:
 
 OBSMER_Bycatch$SEA_STATE_grouped=OBSMER_Bycatch$SEA_STATE
 OBSMER_Bycatch[SEA_STATE== "", SEA_STATE_grouped:=NA]
@@ -1900,7 +1901,7 @@ table(OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$SEA_STATE_grouped, OBSMER_
 table(OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$SEA_STATE_grouped, OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$ICES_DIV_grouped)
 chisq.test(OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$SEA_STATE_grouped, OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$TRIMESTER)
 chisq.test(OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$SEA_STATE_grouped, OBSMER_Bycatch[SPECIES == "Delphinus delphis",]$ICES_DIV_grouped)
-# For the interpretation of sea state effects: trimester and spatial areas are highly correlated with sea conditions: calm sea conditions were mostly reported in the Bay of Biscay and rough sea conditions mainly in the Channel Sea; these two latter conditions were also mostly reported in winter
+# For the interpretation of sea state effects: trimester and spatial areas are highly correlated with sea conditions; calm sea conditions were mostly reported in the Bay of Biscay and rough sea conditions mainly in the Channel Sea, these two latter conditions were also mostly reported in winter
 
 
 
@@ -2027,7 +2028,7 @@ kable_classic(add_header_above(kbl(TableS5, format = "latex", vline= ""), c("", 
 # Vulnerability to by-cath
 
 
-We then explored the susceptibility of individuals to be captured as a function of fishing technique. These analyses initially considered only the risk of being captured (see first graphical outputs, this part was scanned quickly as it had already been thoroughly studied) and how this susceptibility varies with individual traits (i.e. phenotypic vulnerabilities to fishing technique, see subsequent regression models).
+We then explored the susceptibility of individuals to be captured as a function of fishing techniques. These analyses initially considered only the risk of being captured (see first graphical outputs, this part was scanned quickly as it had already been thoroughly studied) and how this susceptibility varies with individual traits (i.e. phenotypic vulnerabilities to fishing technique, see subsequent regression models).
 
 
 ## Bycatch distribution as a function of fishing techniques
@@ -2035,7 +2036,7 @@ We then explored the susceptibility of individuals to be captured as a function 
 ```{r susceptibility}
 
 
-# We first considered only the risk of being captured as a function of fishing technique. This part was scanned quickly as it had already been thoroughly studied by other researches. We only produced graphical outputs illustrating the relationships between fishing behaviours and the bumber of captured individuals.
+# We first considered only the risk of being captured as a function of fishing techniques. This part was scanned quickly as it had already been thoroughly studied by other researches. We only produced graphical outputs illustrating the relationships between fishing behaviours and the number of captured individuals.
 
 
 
@@ -2142,7 +2143,7 @@ OBSMER_Bycatch[
             SPECIES == "Delphinus delphis" & MOST_FISHED_ISSCAAP == "37 - Miscellaneous pelagic fishes", Most_fished_ISSCAAP_associated_taxa := "Trachurus spp (78%) and Scomber spp (22%)"][
               SPECIES == "Delphinus delphis" & MOST_FISHED_ISSCAAP == "38 - Sharks, rays", Most_fished_ISSCAAP_associated_taxa := "Raja spp (42%) and diverse shark species\n(50%, Scyliorhinus, Alopias and Mustelus spp)"]
 
-# To better illustrate the distribution of mostly fished taxa associated with by-catch, we defined the proportion of most fished species or group of species mainly associated with mostly fished ISSCAAP groups (only for ISSCAAP groups with more than 6 by-catch observations, as other groups will not be considered for analyses because too rare). The proportion were computed from the the above tables and the total number of data available for the most fished associated ISSCAAP group.
+# To better illustrate the distribution of mostly fished taxa associated with by-catch, we defined the proportion of most fished species or group of species mainly associated with mostly fished ISSCAAP groups (only for ISSCAAP groups with more than 6 by-catch observations, as other groups will not be considered for analyses because too rare). The proportion were computed from the above tables and the total number of data available for the most fished associated ISSCAAP group.
 
 
 
@@ -2203,7 +2204,7 @@ ggsave("Figure_S10B.pdf", device = "pdf", units = "in", width = 14, height = 8.5
 
 ## Distribution of by-caught individuals' traits as a function of fishing techniques (vulnerabilities to fishing techniques)
 
-We then studied how traits of by-caught individuals varied with fishing techniques used so as to identify potential phenotypic vulnerabilities. Three phenotypic traits were studied: the by-caught individuals' body mass (using both declaration and observation data), body length and sex (using observation data only). 
+We then studied how traits of by-caught individuals varied with used fishing techniques, so as to identify potential phenotypic vulnerabilities. Three phenotypic traits were studied: the by-caught individuals' body mass (using both declaration and observation data), body length and sex (using observation data only). 
 
 
 ### Weight model (observation and declaration data combined)
@@ -2229,7 +2230,7 @@ Decl_Obs_Merged_Bycatch[, TARGETED_ISSCAAP := as.factor(TARGETED_ISSCAAP)]
 ######## Harbour porpoise:
 
 
-# We began to remove too rare categories (N<6) from regression analyses (while having removed all missing data with missing values for at least one of the considered explanatory variables):
+# We began to remove too rare categories (N<6) from regression analyses (while having removed all by-catch data with missing values for at least one of the considered explanatory variables):
 
 table(Decl_Obs_Merged_Bycatch[SPECIES == "Phocoena phocoena" & !is.na(TARGETED_ISSCAAP) & !is.na(MESH_SIZE) & !is.na(FISHING_GEAR_grouped)]$TARGETED_ISSCAAP)
 
@@ -2238,7 +2239,7 @@ table(Decl_Obs_Merged_Bycatch[SPECIES == "Phocoena phocoena" & !is.na(TARGETED_I
 
 
 table(Decl_Obs_Merged_Bycatch[SPECIES == "Phocoena phocoena" & !is.na(TARGETED_ISSCAAP) & !is.na(MESH_SIZE) & !is.na(FISHING_GEAR_grouped) & TARGETED_ISSCAAP %in% c("31 - Pleuronectiformes", "32 - Gadiformes", "34 - Miscellaneous demersal fishes")]$FISHING_GEAR_grouped)
-# in this specific case there is rare categories in both categorical variables: removing rare categories in targeted ISSCAAP groups categories lead to the presence of too rare categories in used fishing gears. We therefore cannot use both variables in the model. In this particular case we chose to favor the use of used fishing gear in explanatory variables.
+# in this specific case there is rare categories in both categorical variables: removing rare categories in targeted ISSCAAP group categories lead to the presence of too rare categories in used fishing gears. We therefore cannot use both variables in the model. In this particular case, we chose to favor the use of used fishing gear in explanatory variables.
 
 
 
@@ -2299,7 +2300,7 @@ plot(cooks.distance(model_BM_PHO) )
 ######## Common dolphin:
 
 
-# We began to remove too rare categories (N<6) from regression analyses (while having removed all missing data with missing values for at least one of the considered explanatory variables):
+# We began to remove too rare categories (N<6) from regression analyses (while having removed all by-catch data with missing values for at least one of the considered explanatory variables):
 
 table(Decl_Obs_Merged_Bycatch[SPECIES == "Delphinus delphis" & !is.na(TARGETED_ISSCAAP) & !is.na(MESH_SIZE) & !is.na(FISHING_GEAR_grouped)]$TARGETED_ISSCAAP)
 
@@ -2451,7 +2452,7 @@ OBSMER_Bycatch[, SEX := as.factor(SEX)]
 
 
 apply(OBSMER_Bycatch, 2, function(x) table(is.na(x)))
-# some variable present too many missing values to be included in analyses (as gear speed only available for trawls)
+# some variables present too many missing values to be included in analyses (as gear speed only available for trawls)
 
 cor.test(OBSMER_Bycatch$GEAR_DIMENSION, OBSMER_Bycatch$MESH_SIZE)
 wilcox.test(OBSMER_Bycatch$GEAR_DIMENSION ~ OBSMER_Bycatch$FISHING_GEAR_grouped)
@@ -2481,7 +2482,7 @@ kruskal.test(OBSMER_Bycatch$GEAR_DEPTH, OBSMER_Bycatch$MOST_FISHED_ISSCAAP)
 ######## Harbour porpoise:
 
 
-# We began to remove too rare categories (N<6) from regression analyses (while having removed all missing data with missing values for at least one of the considered explanatory variables):
+# We began to remove too rare categories (N<6) from regression analyses (while having removed all by-catch data with missing values for at least one of the considered explanatory variables):
 
 table(OBSMER_Bycatch[SPECIES == "Phocoena phocoena" & !is.na(BODY_LENGTH) & !is.na(MOST_FISHED_ISSCAAP) & !is.na(MESH_SIZE) & !is.na(FISHING_GEAR_grouped) & !is.na(DURATION_OP) & !is.na(TOTAL_CATCH_WEIGHT) & !is.na(DETERRENT_DEVICE)]$MOST_FISHED_ISSCAAP)
 
@@ -2494,7 +2495,7 @@ table(OBSMER_Bycatch[SPECIES == "Phocoena phocoena" & !is.na(BODY_LENGTH) & !is.
 
 
 table(OBSMER_Bycatch[SPECIES == "Phocoena phocoena" & !is.na(BODY_LENGTH) & !is.na(MOST_FISHED_ISSCAAP) & !is.na(MESH_SIZE) & !is.na(FISHING_GEAR_grouped) & MOST_FISHED_ISSCAAP %in% c("31 - Pleuronectiformes", "34 - Miscellaneous demersal fishes")]$FISHING_GEAR_grouped)
-# in this specific case there is rare categories in both categorical variables: removing rare categories in targeted ISSCAAP groups categories lead to the presence of too rare categories in used fishing gears. We therefore cannot use both variables in the model. In this particular case we chose to favor the use of used fishing gear in explanatory variables.
+# in this specific case there are rare categories in both categorical variables: removing rare categories in targeted ISSCAAP groups categories lead to the presence of too rare categories in used fishing gears. We therefore cannot use both variables in the model. In this particular case we chose to favor the use of used fishing gear in explanatory variables.
 
 
 
@@ -2504,7 +2505,7 @@ OBSMER_Bycatch_BL_PHO = OBSMER_Bycatch[SPECIES == "Phocoena phocoena" & !is.na(B
 
 
 
-# we then checked for collinearity between explanatory variables (and for the inclusion of potential random effects, only when there is significant non-parametric tests of spatio-temporal (and source) effects on the phenotype of by-catch individuals):
+# we then checked for collinearity between explanatory variables (and for the inclusion of potential random effects, only when there are significant non-parametric tests of spatio-temporal (and source) effects on the phenotype of by-catch individuals):
 
 
 vif(lm(data = OBSMER_Bycatch_BL_PHO, BODY_LENGTH ~ MESH_SIZE + FISHING_GEAR_grouped + DURATION_OP + TOTAL_CATCH_WEIGHT))
@@ -2564,7 +2565,7 @@ plot(cooks.distance(model_BL_PHO) )
 ######## Common dolphin:
 
 
-# We began to remove too rare categories (N<6) from regression analyses (while having removed all missing data with missing values for at least one of the considered explanatory variables):
+# We began to remove too rare categories (N<6) from regression analyses (while having removed all by-catch data with missing values for at least one of the considered explanatory variables):
 
 table(OBSMER_Bycatch[SPECIES == "Delphinus delphis" & !is.na(BODY_LENGTH) & !is.na(MOST_FISHED_ISSCAAP) & !is.na(MESH_SIZE) & !is.na(FISHING_GEAR_grouped) & !is.na(DURATION_OP) & !is.na(TOTAL_CATCH_WEIGHT) & !is.na(DETERRENT_DEVICE)]$MOST_FISHED_ISSCAAP)
 
@@ -2586,7 +2587,7 @@ OBSMER_Bycatch_BL_DCO = OBSMER_Bycatch[SPECIES == "Delphinus delphis" & !is.na(B
 
 
 
-# we then checked for collinearity between explanatory variables (and for the inclusion of potential random effects, only when there is significant non-parametric tests of spatio-temporal (and source) effects on the phenotype of by-catch individuals):
+# we then checked for collinearity between explanatory variables (and for the inclusion of potential random effects, only when there are significant non-parametric tests of spatio-temporal (and source) effects on the phenotype of by-catch individuals):
 
 vif(lm(data = OBSMER_Bycatch_BL_DCO, BODY_LENGTH ~ MESH_SIZE + FISHING_GEAR_grouped + MOST_FISHED_ISSCAAP + DURATION_OP + TOTAL_CATCH_WEIGHT + DETERRENT_DEVICE))
 # correlation level between explanatory variables reasonable (GVIF^(1/(2*Df)) < 2.24)
@@ -2706,35 +2707,6 @@ plot(cooks.distance(model_BL_DCO_squared) )
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-############ Modifier legende axe abscisse pour simplifier interpretation ?????
-
-
-
-#reordering variables for plots:
-
-# OBSMER_size_del$ISSCAAP=factor(OBSMER_size_del$ISSCAAP, levels = c("31","38","32","36","37","33","34"), labels=c("Pleuronectiformes\n(mainly soles)", "Sharks, rays", "Gadiformes\n(mainly hake and gadoids)", "Tunas, bonitos", "Miscellaneous pelagic fishes\n(mainly mackerells)", "Miscellaneous coastal fishes\n(mainly sea bass)", "Miscellaneous demersal fishes\n(mainly monkfishes or St Pierre)")) # 31:poisson plats, 32:merlus et gadidés, 33: mainly bass, 34: démerseaux (baudroies, saint pierre), 36: thon, bonite, 37: maqueraux, chinchard, 38: requins, raies 
-
-
-
-
-
-
-
-
-
-
-
 ```
 
 ### Sex model (OBSMER)
@@ -2747,7 +2719,7 @@ plot(cooks.distance(model_BL_DCO_squared) )
 ######## Harbour porpoise:
 
 
-# We began to remove too rare categories (N<6) from regression analyses (while having removed all missing data with missing values for at least one of the considered explanatory variables):
+# We began to remove too rare categories (N<6) from regression analyses (while having removed all by-catch data with missing values for at least one of the considered explanatory variables):
 
 table(OBSMER_Bycatch[SPECIES == "Phocoena phocoena" & !is.na(SEX) & !is.na(MOST_FISHED_ISSCAAP) & !is.na(MESH_SIZE) & !is.na(FISHING_GEAR_grouped) & !is.na(DURATION_OP) & !is.na(TOTAL_CATCH_WEIGHT) & !is.na(DETERRENT_DEVICE)]$MOST_FISHED_ISSCAAP)
 
@@ -2768,7 +2740,7 @@ OBSMER_Bycatch_Sex_PHO = OBSMER_Bycatch[SPECIES == "Phocoena phocoena" & !is.na(
 
 
 
-# we then checked for collinearity between explanatory variables (and for the inclusion of potential random effects, only when there is significant non-parametric tests of spatio-temporal (and source) effects on the phenotype of by-catch individuals):
+# we then checked for collinearity between explanatory variables (and for the inclusion of potential random effects, only when there are significant non-parametric tests of spatio-temporal (and source) effects on the phenotype of by-catch individuals):
 
 
 vif(glm(data = OBSMER_Bycatch_Sex_PHO, SEX ~ MESH_SIZE + MOST_FISHED_ISSCAAP + DURATION_OP + TOTAL_CATCH_WEIGHT, family = "binomial"))
@@ -2814,7 +2786,7 @@ plot(cooks.distance(model_BL_PHO) )
 ######## Common dolphin:
 
 
-# We began to remove too rare categories (N<6) from regression analyses (while having removed all missing data with missing values for at least one of the considered explanatory variables):
+# We began to remove too rare categories (N<6) from regression analyses (while having removed all by-catch data with missing values for at least one of the considered explanatory variables):
 
 table(OBSMER_Bycatch[SPECIES == "Delphinus delphis" & !is.na(SEX) & !is.na(MOST_FISHED_ISSCAAP) & !is.na(MESH_SIZE) & !is.na(FISHING_GEAR_grouped) & !is.na(DURATION_OP) & !is.na(TOTAL_CATCH_WEIGHT) & !is.na(DETERRENT_DEVICE)]$MOST_FISHED_ISSCAAP)
 
@@ -2836,7 +2808,7 @@ OBSMER_Bycatch_Sex_DCO = OBSMER_Bycatch[SPECIES == "Delphinus delphis" & !is.na(
 
 
 
-# we then checked for collinearity between explanatory variables (and for the inclusion of potential random effects, only when there is significant non-parametric tests of spatio-temporal (and source) effects on the phenotype of by-catch individuals):
+# we then checked for collinearity between explanatory variables (and for the inclusion of potential random effects, only when there are significant non-parametric tests of spatio-temporal (and source) effects on the phenotype of by-catch individuals):
 
 vif(glm(data = OBSMER_Bycatch_Sex_DCO, SEX ~ MESH_SIZE + FISHING_GEAR_grouped + MOST_FISHED_ISSCAAP + DURATION_OP + TOTAL_CATCH_WEIGHT + DETERRENT_DEVICE, family = "binomial"))
 # correlation level between explanatory variables reasonable (GVIF^(1/(2*Df)) < 2.24)
@@ -2896,7 +2868,7 @@ plot(cooks.distance(model_sex_DCO) )
 
 
 
-### Global table (Table S6) of vulnerabilities regression models (ANOVA, type II):
+### Global table (Table S6) of phenotypic vulnerabilities regression models (ANOVA, type II):
 
 
 TableS6 = merge(merge(merge(merge(merge(merge(merge(
@@ -2969,7 +2941,7 @@ kable_classic(add_header_above(kbl(TableS6, format = "latex", vline= ""), c("", 
 
 
 
-### Table (S7) combining pairwise contrast comparison test for each significant variable in vulnerabilities regression models:
+### Table (S7) combining pairwise contrast comparison tests for each significant variable in vulnerabilities regression models:
 
 
 TableS7 = rbind( 
