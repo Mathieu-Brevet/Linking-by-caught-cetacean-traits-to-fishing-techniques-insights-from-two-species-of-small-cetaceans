@@ -804,7 +804,8 @@ plot(cooks.distance(SPT_sensitivity_DEL_sex) )
   # Size:
 
 
-# only model on size are performed because this measure is systematically performed for stranded individuals (contrary to weight) and more reliable in our specific case (body mass values are guess estimations)
+table(is.na(data_strandings_DEL$BODY_MASS))
+# only model on size are performed because this measure is systematically performed for stranded individuals (contrary to weight, with too limited sample size: see the proportion of missing values above) and more reliable in our specific case (body mass values are guess estimations)
 
 # Models on body size were performed for both sex separately to account for potential sex-specific spatio-temporal sensitivity profiles
 
@@ -997,7 +998,8 @@ plot(cooks.distance(SPT_sensitivity_PHO_sex) )
   # Size:
 
 
-# only model on size are performed because this measure is systematically performed for stranded individuals (contrary to weight) and more reliable in our specific case
+table(is.na(data_strandings_PHO$BODY_MASS))
+# only model on size are performed because this measure is systematically performed for stranded individuals (contrary to weight, with too limited sample size: see the proportion of missing values above) and more reliable in our specific case (body mass values are guess estimations)
 
 # Models on body size were performed for both sex separately to account for potential sex-specific spatio-temporal sensitivity profiles
 
