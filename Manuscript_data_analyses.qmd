@@ -2270,10 +2270,10 @@ summary(model_BM_PHO)
 Anova(model_BM_PHO)
 
 plot(ggemmeans(model_BM_PHO, terms = "MESH_SIZE"), show_data = T, jitter = 2, dot_alpha = 0.2) +
-  ggtitle("Predicted by-caught individual's body mass\nas a function of used mesh size") +
+  ggtitle("Predicted by-caught individual's BM\nas a function of used mesh size") +
   labs(y = "Body mass (kg)", x = "Mesh size (mm)")  +
   scale_x_continuous(limits = c(75, 300)) +
-  theme(text = element_text(size = 30)) 
+  theme(text = element_text(size = 40)) 
 
 ggsave("Figure_4A.pdf", device = "pdf", units = "in", width = 14, height = 8.5)
 
@@ -2526,9 +2526,9 @@ summary(model_BL_PHO)
 Anova(model_BL_PHO)
 
 plot(ggemmeans(model_BL_PHO, terms = "MESH_SIZE"), show_data = T, jitter = 2, dot_alpha = 0.2) +
-  ggtitle("Predicted by-caught individual's body length\nas a function of used mesh size") +
+  ggtitle("Predicted by-caught individual's BL\nas a function of used mesh size") +
   labs(y = "Body length (cm)", x = "Mesh size (mm)")  +
-  theme(text = element_text(size = 30)) 
+  theme(text = element_text(size = 40)) 
 
 ggsave("Figure_4B.pdf", device = "pdf", units = "in", width = 14, height = 8.5)
 
@@ -2539,9 +2539,9 @@ ggplot(data = OBSMER_Bycatch_BL_PHO, aes(BODY_LENGTH, MESH_SIZE, color = TARGETE
 
 
 plot(ggemmeans(model_BL_PHO, terms = "FISHING_GEAR_grouped"), show_data = T, jitter = c(0.7, 0), dot_alpha = 0.2) +
-  ggtitle("Predicted by-caught individual's body length\nas a function of used fishing gear") +
+  ggtitle("Predicted by-caught individual's BL\nas a function of used fishing gear") +
   labs(y = "Body length (cm)", x = "Fishing gear")  +
-  theme(text = element_text(size = 30)) 
+  theme(text = element_text(size = 40)) 
 
 ggsave("Figure_4C.pdf", device = "pdf", units = "in", width = 14, height = 8.5)
 
