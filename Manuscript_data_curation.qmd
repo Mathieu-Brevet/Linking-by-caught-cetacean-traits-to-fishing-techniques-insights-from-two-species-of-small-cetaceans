@@ -1067,9 +1067,10 @@ OBSMER_Bycatch[TIMING_OP=="Evening", TIMING_OP:="Evening (18:00 - 00:00)"]
 OBSMER_Bycatch[TIMING_OP=="Morning", TIMING_OP:="Morning (06:00 - 12:00)"]
 OBSMER_Bycatch[TIMING_OP=="Night", TIMING_OP:="Night (00:00 - 06:00)"]
 
+OBSMER_Bycatch$SEX = as.character(OBSMER_Bycatch$SEX)
 OBSMER_Bycatch[SEX=="Femelle", SEX:="Female"]
 OBSMER_Bycatch[SEX=="Male", SEX:="Male"]
-
+OBSMER_Bycatch$SEX = as.factor(OBSMER_Bycatch$SEX)
 
 
 

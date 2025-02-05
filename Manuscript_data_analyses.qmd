@@ -2272,7 +2272,7 @@ Anova(model_BM_PHO)
 plot(ggemmeans(model_BM_PHO, terms = "MESH_SIZE"), show_data = T, jitter = 2, dot_alpha = 0.2) +
   ggtitle("Predicted by-caught individual's body mass\nas a function of used mesh size") +
   labs(y = "Body mass (kg)", x = "Mesh size (mm)")  +
-  scale_y_continuous(limits = c(75, 300)) +
+  scale_x_continuous(limits = c(75, 300)) +
   theme(text = element_text(size = 30)) 
 
 ggsave("Figure_4A.pdf", device = "pdf", units = "in", width = 14, height = 8.5)
